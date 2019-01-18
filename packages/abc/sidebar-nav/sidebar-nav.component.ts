@@ -1,22 +1,22 @@
+import { DOCUMENT } from '@angular/common';
 import {
-  Component,
-  Renderer2,
-  Inject,
-  OnInit,
-  OnDestroy,
-  HostListener,
   ChangeDetectionStrategy,
   ChangeDetectorRef,
-  Input,
-  Output,
+  Component,
   EventEmitter,
+  HostListener,
+  Inject,
+  Input,
+  OnDestroy,
+  OnInit,
+  Output,
+  Renderer2,
 } from '@angular/core';
-import { Router, NavigationEnd } from '@angular/router';
-import { DOCUMENT, LocationStrategy } from '@angular/common';
-import { Subscription } from 'rxjs';
-import { filter } from 'rxjs/operators';
+import { NavigationEnd, Router } from '@angular/router';
+import { Subject } from 'rxjs';
+import { filter, takeUntil } from 'rxjs/operators';
 
-import { MenuService, SettingsService, Menu } from '@delon/theme';
+import { Menu, MenuService, SettingsService, WINDOW } from '@delon/theme';
 import { InputBoolean } from '@delon/util';
 
 import { Nav } from './sidebar-nav.types';
@@ -28,46 +28,37 @@ const FLOATINGCLS = 'sidebar-nav__floating';
   selector: 'sidebar-nav',
   templateUrl: './sidebar-nav.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  preserveWhitespaces: false,
 })
 export class SidebarNavComponent implements OnInit, OnDestroy {
   private bodyEl: HTMLBodyElement;
-  private change$: Subscription;
+  private unsubscribe$ = new Subject<void>();
   /** @inner */
   floatingEl: HTMLDivElement;
   list: Nav[] = [];
 
-  @Input()
-  @InputBoolean()
-  autoCloseUnderPad = true;
-
-  @Output()
-  readonly select = new EventEmitter<Menu>();
-
-  constructor(
-    private menuSrv: MenuService,
-    private settings: SettingsService,
-    private router: Router,
-    private locationStrategy: LocationStrategy,
-    private render: Renderer2,
-    private cd: ChangeDetectorRef,
-    @Inject(DOCUMENT) private doc: any,
-  ) {}
+  @Input() @InputBoolean() disabledAcl = false;
+  @Input() @InputBoolean() autoCloseUnderPad = true;
+  @Input() @InputBoolean() recursivePath = true;
+  @Output() readonly select = new EventEmitter<Menu>();
 
   get collapsed() {
     return this.settings.layout.collapsed;
   }
 
-  ngOnInit() {
-    this.bodyEl = this.doc.querySelector('body');
-    this.menuSrv.openedByUrl(this.router.url);
-    this.genFloatingContainer();
-    this.change$ = <any>this.menuSrv.change.subscribe(res => {
-      this.list = res;
-      this.cd.detectChanges();
-    });
-    this.installUnderPad();
+  private get _d() {
+    return this.menuSrv.menus;
   }
+
+  constructor(
+    private menuSrv: MenuService,
+    private settings: SettingsService,
+    private router: Router,
+    private render: Renderer2,
+    private cdr: ChangeDetectorRef,
+    // tslint:disable-next-line:no-any
+    @Inject(DOCUMENT) private doc: any,
+    @Inject(WINDOW) private win: Window,
+  ) {}
 
   private floatingAreaClickHandle(e: MouseEvent) {
     e.stopPropagation();
@@ -75,21 +66,14 @@ export class SidebarNavComponent implements OnInit, OnDestroy {
     if (linkNode.nodeName !== 'A') {
       return false;
     }
-    let url: string = linkNode.getAttribute('href');
-    if (url && url.startsWith('#')) {
-      url = url.slice(1);
-    }
-    if (linkNode.dataset!.type === 'external') {
-      return true;
-    }
-
-    // 如果配置了bashHref 则去掉baseHref
-    const baseHerf = this.locationStrategy.getBaseHref();
-    if (baseHerf) {
-      url = url.slice(baseHerf.length);
-    }
-    this.router.navigateByUrl(url);
-    this.onSelect(this.menuSrv.getPathByUrl(url).pop());
+    const id = +linkNode.dataset!.id;
+    let item: Nav;
+    this.menuSrv.visit(this._d, i => {
+      if (!item && i.__id === id) {
+        item = i;
+      }
+    });
+    this.to(item);
     this.hideAll();
     e.preventDefault();
     return false;
@@ -141,6 +125,7 @@ export class SidebarNavComponent implements OnInit, OnDestroy {
 
   private hideAll() {
     const allNode = this.floatingEl.querySelectorAll('.' + FLOATINGCLS);
+    // tslint:disable-next-line:prefer-for-of
     for (let i = 0; i < allNode.length; i++) {
       allNode[i].classList.remove(SHOWCLS);
     }
@@ -179,12 +164,23 @@ export class SidebarNavComponent implements OnInit, OnDestroy {
     this.calPos(linkNode as HTMLLinkElement, subNode);
   }
 
-  onSelect(item: Menu) {
+  to(item: Menu) {
     this.select.emit(item);
+    if (item.disabled) return ;
+
+    if (item.externalLink) {
+      if (item.target === '_blank') {
+        this.win.open(item.externalLink);
+      } else {
+        this.win.location.href = item.externalLink;
+      }
+      return false;
+    }
+    this.router.navigateByUrl(item.link);
   }
 
   toggleOpen(item: Nav) {
-    this.menuSrv.visit((i, p) => {
+    this.menuSrv.visit(this._d, (i, p) => {
       if (i !== item) i._open = false;
     });
     let pItem = item.__parent;
@@ -193,7 +189,7 @@ export class SidebarNavComponent implements OnInit, OnDestroy {
       pItem = pItem.__parent;
     }
     item._open = !item._open;
-    this.cd.markForCheck();
+    this.cdr.markForCheck();
   }
 
   @HostListener('click')
@@ -209,9 +205,40 @@ export class SidebarNavComponent implements OnInit, OnDestroy {
     this.hideAll();
   }
 
+  ngOnInit() {
+    const { doc, router, unsubscribe$, menuSrv, cdr } = this;
+    this.bodyEl = doc.querySelector('body');
+    menuSrv.openedByUrl(router.url, this.recursivePath);
+    this.genFloatingContainer();
+    menuSrv.change.pipe(takeUntil(unsubscribe$)).subscribe(data => {
+      menuSrv.visit(data, i => {
+        if (i._aclResult) return;
+        if (this.disabledAcl) {
+          i.disabled = true;
+        } else {
+          i._hidden = true;
+        }
+      });
+      this.list = menuSrv.menus;
+      cdr.detectChanges();
+    });
+    router.events
+      .pipe(
+        takeUntil(unsubscribe$),
+        filter(e => e instanceof NavigationEnd),
+      )
+      .subscribe((e: NavigationEnd) => {
+        this.menuSrv.openedByUrl(e.urlAfterRedirects, this.recursivePath);
+        this.underPad();
+        this.cdr.detectChanges();
+      });
+    this.underPad();
+  }
+
   ngOnDestroy(): void {
-    this.change$.unsubscribe();
-    if (this.route$) this.route$.unsubscribe();
+    const { unsubscribe$ } = this;
+    unsubscribe$.next();
+    unsubscribe$.complete();
     this.clearFloatingContainer();
   }
 
@@ -221,19 +248,8 @@ export class SidebarNavComponent implements OnInit, OnDestroy {
     return window.innerWidth < 768;
   }
 
-  private route$: Subscription;
-  private installUnderPad() {
-    if (!this.autoCloseUnderPad) return;
-    this.route$ = <any>(
-      this.router.events
-        .pipe(filter(e => e instanceof NavigationEnd))
-        .subscribe(s => this.underPad())
-    );
-    this.underPad();
-  }
-
   private underPad() {
-    if (this.isPad && !this.collapsed) {
+    if (this.autoCloseUnderPad && this.isPad && !this.collapsed) {
       setTimeout(() => this.openAside(true));
     }
   }

@@ -3,11 +3,11 @@ import { TestBed } from '@angular/core/testing';
 import { filter } from 'rxjs/operators';
 
 import { ACLService } from '@delon/acl';
-import {
-  ALAIN_I18N_TOKEN,
-  AlainI18NServiceFake,
-} from '../i18n/i18n';
 import { deepCopy } from '@delon/util';
+import {
+  AlainI18NServiceFake,
+  ALAIN_I18N_TOKEN,
+} from '../i18n/i18n';
 
 import { Menu } from './interface';
 import { MenuService } from './menu.service';
@@ -34,7 +34,7 @@ describe('Service: Menu', () => {
       text: 'text',
       children: [{ text: 'sub text', link: '/text/sub', shortcut: true }],
     },
-    { text: 'text', link: '/test', linkExact: true, badge: 10 },
+    { text: 'text', link: '/test', badge: 10 },
     {
       text: 'text',
       link: '/demo1',
@@ -47,6 +47,8 @@ describe('Service: Menu', () => {
     { text: 'sub', children: [] },
   ];
 
+  afterEach(() => srv.ngOnDestroy());
+
   describe('[default]', () => {
     beforeEach(() => {
       injector = TestBed.configureTestingModule({
@@ -58,8 +60,6 @@ describe('Service: Menu', () => {
       });
       srv = injector.get(MenuService);
     });
-
-    afterEach(() => srv.ngOnDestroy());
 
     it('should create an instance', () => {
       expect(srv).toBeTruthy();
@@ -96,6 +96,13 @@ describe('Service: Menu', () => {
       srv.add(newMenus);
       expect(srv.menus[0].group).toBe(true);
       expect(srv.menus[1].group).toBe(false);
+    });
+
+    it('should be disabed item when setting [disabled] property', () => {
+      const newMenus = [{ text: 'new menu' }, { text: 'new menu', disabled: true }];
+      srv.add(newMenus);
+      expect(srv.menus[0].disabled).toBe(false);
+      expect(srv.menus[1].disabled).toBe(true);
     });
 
     describe('#openedByUrl', () => {
@@ -148,7 +155,7 @@ describe('Service: Menu', () => {
         expect(srv.menus[0].children[1].children.length).toBe(1);
       });
       it('should be use [shortcutRoot: true]', () => {
-        const newMenus = <Menu[]>[
+        const newMenus = [
           {
             text: 'new menu',
             children: [
@@ -161,12 +168,12 @@ describe('Service: Menu', () => {
             text: 'text',
             children: [{ text: 'sub text', link: '/text/sub', shortcut: true }],
           },
-        ];
+        ] as Menu[];
         srv.add(newMenus);
         expect(srv.menus[0].children[2].children.length).toBe(1);
       });
       it('should be under zero node', () => {
-        const newMenus = <Menu[]>[
+        const newMenus = [
           {
             text: 'new menu',
             i18n: 'test',
@@ -175,9 +182,29 @@ describe('Service: Menu', () => {
             text: 'text',
             children: [{ text: 'sub text', link: '/text/sub', shortcut: true }],
           },
-        ];
+        ] as Menu[];
         srv.add(newMenus);
         expect(srv.menus[0].children[0].children.length).toBe(1);
+      });
+      it('should be clean children', () => {
+        const newMenus = [
+          {
+            text: 'new menu',
+            children: [
+              { text: 'submenu1', link: '/' },
+              { text: 'submenu2', link: '/' },
+              { text: 'sc', shortcutRoot: true },
+            ],
+          },
+          {
+            text: 'text',
+            children: [{ text: 'sub text', link: '/text/sub', shortcut: true }],
+          },
+        ] as Menu[];
+        srv.add(newMenus);
+        const shortcutList = srv.menus[0].children[2].children;
+        expect(shortcutList.length).toBe(1);
+        expect(shortcutList[0].__parent).toBe(srv.menus[0].children[2]);
       });
     });
 
@@ -187,9 +214,8 @@ describe('Service: Menu', () => {
         { text: 'new menu', acl: 'user' },
       ];
       srv.add(newMenus);
-      expect(srv.menus[0]._hidden).toBe(false);
-      expect(srv.menus[1]._hidden).toBe(true);
-      srv.ngOnDestroy();
+      expect(srv.menus[0]._aclResult).toBe(true);
+      expect(srv.menus[1]._aclResult).toBe(false);
     });
 
     it('#change', (done: () => void) => {
@@ -197,7 +223,6 @@ describe('Service: Menu', () => {
       srv.change.pipe(filter(ls => ls.length > 0)).subscribe(res => {
         expect(res.length).toBe(1);
         expect(res[0].text).toBe(newMenus[0].text);
-        srv.ngOnDestroy();
         done();
       });
       srv.add(newMenus);
@@ -223,7 +248,7 @@ describe('Service: Menu', () => {
         srv.add([{
           text: 'dashboard',
           link: '/dashboard',
-          icon: null
+          icon: null,
         }]);
         const icon: any = srv.menus[0].icon;
         expect(icon).toBeNull();
@@ -232,7 +257,7 @@ describe('Service: Menu', () => {
         srv.add([{
           text: 'dashboard',
           link: '/dashboard',
-          icon: undefined
+          icon: undefined,
         }]);
         const icon: any = srv.menus[0].icon;
         expect(icon).toBeUndefined();
@@ -241,7 +266,7 @@ describe('Service: Menu', () => {
         srv.add([{
           text: 'dashboard',
           link: '/dashboard',
-          icon: 'aa'
+          icon: 'aa',
         }]);
         const icon: any = srv.menus[0].icon;
         expect(typeof icon).toBe('object');
@@ -251,7 +276,7 @@ describe('Service: Menu', () => {
         srv.add([{
           text: 'dashboard',
           link: '/dashboard',
-          icon: { type: 'icon', value: 'user' }
+          icon: { type: 'icon', value: 'user' },
         }]);
         const icon: any = srv.menus[0].icon;
         expect(typeof icon).toBe('object');
@@ -261,7 +286,7 @@ describe('Service: Menu', () => {
         srv.add([{
           text: 'dashboard',
           link: '/dashboard',
-          icon: `anticon anticon-user`
+          icon: `anticon anticon-user`,
         }]);
         const icon: any = srv.menus[0].icon;
         expect(typeof icon).toBe('object');
@@ -272,7 +297,7 @@ describe('Service: Menu', () => {
         srv.add([{
           text: 'dashboard',
           link: '/dashboard',
-          icon: `http://ng-alain.com/1.jpg`
+          icon: `http://ng-alain.com/1.jpg`,
         }]);
         const icon: any = srv.menus[0].icon;
         expect(typeof icon).toBe('object');
@@ -295,7 +320,6 @@ describe('Service: Menu', () => {
       expect(srv.resume).not.toHaveBeenCalled();
       injector.get(ALAIN_I18N_TOKEN).use('en');
       expect(srv.resume).toHaveBeenCalled();
-      srv.ngOnDestroy();
     });
 
     it('without ALAIN_I18N_TOKEN', () => {
@@ -306,7 +330,6 @@ describe('Service: Menu', () => {
         ],
       });
       srv = injector.get(MenuService);
-      srv.ngOnDestroy();
       expect(true).toBe(true);
     });
   });

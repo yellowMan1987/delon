@@ -1,3 +1,4 @@
+// tslint:disable:no-any
 export interface ZipWriteOptions {
   /** save file name, default: `download.zip` */
   filename?: string;

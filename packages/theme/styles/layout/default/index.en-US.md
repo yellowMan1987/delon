@@ -1,6 +1,6 @@
 ---
 type: Theme
-order: 10
+order: 100
 title: Default Layout
 ---
 
@@ -17,6 +17,7 @@ The default layout all parameters are prefixed with `@alain-default-`.
 | `@alain-default-header-padding` | `@layout-gutter * 2` | Horizontal padding of header |
 | `@alain-default-header-search-enabled` | `true` | Whether top search |
 | `@alain-default-header-search-height` | `34px` | Height of top search |
+| `@alain-default-header-icon-fs` | `18px` | Font size of icon |
 | `@alain-default-aside-wd` | `200px` | Width of aside |
 | `@alain-default-aside-bg` | `#fff` | Background-color of aside |
 | `@alain-default-aside-scrollbar-width` | `0` | Scrollbar width of aside |
@@ -24,6 +25,8 @@ The default layout all parameters are prefixed with `@alain-default-`.
 | `@alain-default-aside-scrollbar-track-color` | `transparent` | Scrollbar track color of aside |
 | `@alain-default-aside-scrollbar-thumb-color` | `transparent` | Scrollbar thumb color of aside |
 | `@alain-default-aside-nav-fs` | `14px` | Font size of nav name |
+| `@alain-default-aside-nav-icon-width`          | `14px`                         | Width of nav icon     |
+| `@alain-default-aside-nav-img-wh`              | `14px`                         | Width & height of nav image |
 | `@alain-default-aside-nav-padding-top-bottom` | `@layout-gutter` | Vertical padding of nav |
 | `@alain-default-aside-nav-item-height` | `38px` | Item height of nav |
 | `@alain-default-aside-nav-text-color` | `rgba(0, 0, 0, 0.65)` | Nav text color |
@@ -33,10 +36,13 @@ The default layout all parameters are prefixed with `@alain-default-`.
 | `@alain-default-aside-nav-selected-bg` | `#fcfcfc` | Nav selected background color |
 | `@alain-default-aside-collapsed-wd` | `@layout-gutter * 8` |  Width of aside collapsed |
 | `@alain-default-aside-collapsed-nav-fs` | `24px` | Font size of aside collapsed |
+| `@alain-default-aside-collapsed-nav-img-wh` | `24px` | Width & height nav image of aside collapsed |
 | `@alain-default-content-heading-bg` | `#fafbfc` |  Heading background color of content area |
 | `@alain-default-content-heading-border` | `#efe3e5` | Heading bottom border color of content area |
 | `@alain-default-content-padding` | `@layout-gutter * 3` | Padding of content area |
 | `@alain-default-content-bg` | `#f5f7fa` | Background color of content area |
+| `@alain-default-widget-app-icons-enabled` | `true` | Whether the app-icon widget styles |
+| `@alain-default-aside-user-enabled`       | `true` | Whether the user styles of aside |
 
 ## Usage
 

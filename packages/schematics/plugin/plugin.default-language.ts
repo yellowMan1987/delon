@@ -1,26 +1,15 @@
 import {
-  Tree,
-  SchematicContext,
+  Rule,
   SchematicsException,
+  SchematicContext,
+  Tree,
 } from '@angular-devkit/schematics';
+import { getLangConfig } from '../core/lang.config';
 import { getProject } from '../utils/project';
 import { PluginOptions } from './interface';
 
-const CONFIG = [
-  {
-    langs: ['zh-Hans', 'zh-cn', 'zh-Hans-CN', 'zh'],
-    zorro: 'zh_CN',
-    delon: 'zh_CN',
-  },
-  { langs: ['zh-Hant', 'zh-tw', 'zh-Hant-TW'], zorro: 'zh_TW', delon: 'zh_TW' },
-  { langs: ['en'], zorro: 'en_US', delon: 'en_US' },
-];
-
-function getTarget(lang: string): any {
-  return CONFIG.find(w => w.langs.includes(lang));
-}
-
-export function pluginDefaultLanguage(options: PluginOptions): any {
+// tslint:disable-next-line:no-any
+export function pluginDefaultLanguage(options: PluginOptions): Rule {
   return (host: Tree, context: SchematicContext) => {
     if (options.type !== 'add') {
       throw new SchematicsException(
@@ -48,7 +37,7 @@ export function pluginDefaultLanguage(options: PluginOptions): any {
     if (oldLang === options.defaultLanguage) {
       return;
     }
-    const targetLang = getTarget(options.defaultLanguage);
+    const targetLang = getLangConfig(options.defaultLanguage);
     if (targetLang == null) {
       console.warn(
         `Target language not supported, refer to https://ng-alain.com/cli/plugin#defaultLanguage`,

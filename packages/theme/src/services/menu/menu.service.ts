@@ -1,11 +1,11 @@
-import { Injectable, Inject, Optional, OnDestroy } from '@angular/core';
-import { Observable, Subscription, BehaviorSubject } from 'rxjs';
+import { Inject, Injectable, OnDestroy, Optional } from '@angular/core';
+import { BehaviorSubject, Observable, Subscription } from 'rxjs';
 import { share } from 'rxjs/operators';
 
 import { ACLService } from '@delon/acl';
 
-import { ALAIN_I18N_TOKEN, AlainI18NService } from '../i18n/i18n';
-import { Menu } from './interface';
+import { AlainI18NService, ALAIN_I18N_TOKEN } from '../i18n/i18n';
+import { Menu, MenuIcon } from './interface';
 
 @Injectable({ providedIn: 'root' })
 export class MenuService implements OnDestroy {
@@ -20,15 +20,16 @@ export class MenuService implements OnDestroy {
     private i18nSrv: AlainI18NService,
     @Optional() private aclService: ACLService,
   ) {
-    if (this.i18nSrv)
+    if (this.i18nSrv) {
       this.i18n$ = this.i18nSrv.change.subscribe(() => this.resume());
+    }
   }
 
   get change(): Observable<Menu[]> {
     return this._change$.pipe(share());
   }
 
-  visit(callback: (item: Menu, parentMenum: Menu, depth?: number) => void) {
+  visit(data: Menu[], callback: (item: Menu, parentMenum: Menu, depth?: number) => void) {
     const inFn = (list: Menu[], parentMenu: Menu, depth: number) => {
       for (const item of list) {
         callback(item, parentMenu, depth);
@@ -40,7 +41,7 @@ export class MenuService implements OnDestroy {
       }
     };
 
-    inFn(this.data, null, 0);
+    inFn(data, null, 0);
   }
 
   add(items: Menu[]) {
@@ -54,13 +55,12 @@ export class MenuService implements OnDestroy {
   resume(callback?: (item: Menu, parentMenum: Menu, depth?: number) => void) {
     let i = 1;
     const shortcuts: Menu[] = [];
-    this.visit((item, parent, depth) => {
+    this.visit(this.data, (item, parent, depth) => {
       item.__id = i++;
       item.__parent = parent;
       item._depth = depth;
 
       if (!item.link) item.link = '';
-      if (typeof item.linkExact === 'undefined') item.linkExact = false;
       if (!item.externalLink) item.externalLink = '';
 
       // badge
@@ -92,15 +92,14 @@ export class MenuService implements OnDestroy {
         } else if (/^https?:\/\//.test(item.icon)) {
           type = 'img';
         }
+        // tslint:disable-next-line:no-any
         item.icon = { type, value } as any;
       }
+      if (item.icon != null) {
+        item.icon = { theme: 'outline', spin: false, ...(item.icon as MenuIcon) };
+      }
 
-      // shortcut
-      if (parent && item.shortcut === true && parent.shortcutRoot !== true)
-        shortcuts.push(item);
-
-      item.text =
-        item.i18n && this.i18nSrv ? this.i18nSrv.fanyi(item.i18n) : item.text;
+      item.text = item.i18n && this.i18nSrv ? this.i18nSrv.fanyi(item.i18n) : item.text;
 
       // group
       item.group = item.group !== false;
@@ -108,9 +107,15 @@ export class MenuService implements OnDestroy {
       // hidden
       item._hidden = typeof item.hide === 'undefined' ? false : item.hide;
 
+      // disabled
+      item.disabled = typeof item.disabled === 'undefined' ? false : item.disabled;
+
       // acl
-      if (item.acl && this.aclService) {
-        item._hidden = !this.aclService.can(item.acl);
+      item._aclResult = item.acl && this.aclService ? this.aclService.can(item.acl) : true;
+
+      // shortcut
+      if (parent && item.shortcut === true && parent.shortcutRoot !== true) {
+        shortcuts.push(item);
       }
 
       if (callback) callback(item, parent, depth);
@@ -137,24 +142,27 @@ export class MenuService implements OnDestroy {
     if (pos === -1) {
       pos = ls.findIndex(w => w.link.includes('dashboard'));
       pos = (pos !== -1 ? pos : -1) + 1;
-      const shortcutMenu = <Menu>{
+      const shortcutMenu = {
         text: '快捷菜单',
         i18n: 'shortcut',
         icon: 'icon-rocket',
         children: [],
-      };
+      } as Menu;
       this.data[0].children.splice(pos, 0, shortcutMenu);
     }
     let _data = this.data[0].children[pos];
     if (_data.i18n && this.i18nSrv) _data.text = this.i18nSrv.fanyi(_data.i18n);
+    // tslint:disable-next-line:prefer-object-spread
     _data = Object.assign(_data, {
       shortcutRoot: true,
-      _type: 3,
       __id: -1,
+      __parent: null,
+      _type: 3,
       _depth: 1,
     });
     _data.children = shortcuts.map(i => {
       i._depth = 2;
+      i.__parent = _data;
       return i;
     });
   }
@@ -171,11 +179,11 @@ export class MenuService implements OnDestroy {
     this._change$.next(this.data);
   }
 
-  private getHit(url: string, recursive = false, cb: (i: Menu) => void = null) {
+  getHit(data: Menu[], url: string, recursive = false, cb: (i: Menu) => void = null) {
     let item: Menu = null;
 
     while (!item && url) {
-      this.visit(i => {
+      this.visit(data, i => {
         if (cb) {
           cb(i);
         }
@@ -186,10 +194,7 @@ export class MenuService implements OnDestroy {
 
       if (!recursive) break;
 
-      url = url
-        .split('/')
-        .slice(0, -1)
-        .join('/');
+      url = url.split('/').slice(0, -1).join('/');
     }
 
     return item;
@@ -203,10 +208,14 @@ export class MenuService implements OnDestroy {
   openedByUrl(url: string, recursive = false) {
     if (!url) return;
 
-    let findItem = this.getHit(url, recursive, i => (i._open = false));
+    let findItem = this.getHit(this.data, url, recursive, i => {
+      i._selected = false;
+      i._open = false;
+    });
     if (!findItem) return;
 
     do {
+      findItem._selected = true;
       findItem._open = true;
       findItem = findItem.__parent;
     } while (findItem);
@@ -219,7 +228,7 @@ export class MenuService implements OnDestroy {
    */
   getPathByUrl(url: string, recursive = false): Menu[] {
     const ret: Menu[] = [];
-    let item = this.getHit(url, recursive);
+    let item = this.getHit(this.data, url, recursive);
 
     if (!item) return ret;
 

@@ -10,13 +10,19 @@ Often used for tables with scroll bars, a simple [demo](https://ng-alain.github.
 
 ## API
 
-Property | Description | Type | Default
-----|------|-----|------
-`[(fullscreen)]` | Whether full screen (not including top, sidebar area) | `boolean` | -
-`[hideTitle]` | Hide title when `fullscreen` is true | `boolean` | `true`
-`[padding]` | Padding of work area | `number` | `24`
+### full-content
 
-### Control
+Property         | Description                                           | Type      | Default
+-----------------|-------------------------------------------------------|-----------|--------
+`[(fullscreen)]` | Whether full screen (not including top, sidebar area) | `boolean` | -
+`[hideTitle]`    | Hide title when `fullscreen` is true                  | `boolean` | `true`
+`[padding]`      | Padding of work area                                  | `number`  | `24`
+
+### [full-toggle]
+
+Switch whether it is full screen.
+
+## Control
 
 There are three ways:
 

@@ -1,36 +1,41 @@
-import { Component, DebugElement, ViewChild, Injector } from '@angular/core';
+import { Component, DebugElement, Injector, ViewChild } from '@angular/core';
 import {
+  fakeAsync,
+  tick,
   ComponentFixture,
   TestBed,
-  tick,
-  fakeAsync,
 } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
-import { RouterTestingModule } from '@angular/router/testing';
-import { Observable } from 'rxjs';
 import {
-  Router,
   ActivatedRoute,
   ActivatedRouteSnapshot,
+  ExtraOptions,
+  Router,
   RouterStateSnapshot,
   RouteReuseStrategy,
+  ROUTER_CONFIGURATION,
 } from '@angular/router';
+import { RouterTestingModule } from '@angular/router/testing';
+import { Observable } from 'rxjs';
 
+import { configureTestSuite } from '@delon/testing';
 import {
-  MenuService,
-  ALAIN_I18N_TOKEN,
-  DelonLocaleModule,
   en_US,
   zh_CN,
+  ALAIN_I18N_TOKEN,
+  DelonLocaleModule,
   DelonLocaleService,
+  MenuService,
+  ScrollService,
+  WINDOW,
 } from '@delon/theme';
 
-import { ReuseTabModule } from './reuse-tab.module';
+import { AlainI18NServiceFake } from '../../theme/src/services/i18n/i18n';
 import { ReuseTabComponent } from './reuse-tab.component';
-import { ReuseTabMatchMode } from './reuse-tab.interfaces';
+import { ReuseCustomContextMenu, ReuseTabMatchMode } from './reuse-tab.interfaces';
+import { ReuseTabModule } from './reuse-tab.module';
 import { ReuseTabService } from './reuse-tab.service';
 import { ReuseTabStrategy } from './reuse-tab.strategy';
-import { AlainI18NServiceFake } from '../../theme/src/services/i18n/i18n';
 
 let i18nResult = 'zh';
 class MockI18NServiceFake extends AlainI18NServiceFake {
@@ -61,7 +66,7 @@ describe('abc: reuse-tab', () => {
       ],
       imports: [
         DelonLocaleModule,
-        ReuseTabModule.forRoot(),
+        ReuseTabModule,
         RouterTestingModule.withRoutes([
           {
             path: '',
@@ -80,10 +85,11 @@ describe('abc: reuse-tab', () => {
               },
             ],
           },
-        ]),
+        ], { scrollPositionRestoration: 'disabled' }),
       ],
       providers: [
         MenuService,
+        { provide: WINDOW, useValue: window },
         {
           provide: RouteReuseStrategy,
           useClass: ReuseTabStrategy,
@@ -102,9 +108,17 @@ describe('abc: reuse-tab', () => {
       ].concat(
         !needI18n
           ? []
-          : [<any>{ provide: ALAIN_I18N_TOKEN, useClass: MockI18NServiceFake }],
+          : [
+              {
+                provide: ALAIN_I18N_TOKEN,
+                useClass: MockI18NServiceFake,
+              } as any,
+            ],
       ),
     });
+  }
+
+  function createComp() {
     fixture = TestBed.createComponent(AppComponent);
     dl = fixture.debugElement;
     tick();
@@ -128,7 +142,9 @@ describe('abc: reuse-tab', () => {
   afterEach(() => rtComp.ngOnDestroy());
 
   describe('', () => {
-    beforeEach(fakeAsync(() => genModule()));
+    configureTestSuite(genModule);
+
+    beforeEach(fakeAsync(() => createComp()));
 
     describe('[default]', () => {
       it('should be create an instance', fakeAsync(() => {
@@ -475,6 +491,40 @@ describe('abc: reuse-tab', () => {
           )
           .expectCount(2);
       }));
+      describe('custom menu', () => {
+        beforeEach(() => {
+          layoutComp.customContextMenu = [
+            {
+              id: 'custom1',
+              title: '自定义1',
+              fn: jasmine.createSpy('custom.menu.1'),
+            },
+            {
+              id: 'custom2',
+              title: '自定义2',
+              disabled: () => true,
+              fn: jasmine.createSpy('custom.menu.2'),
+            },
+          ];
+          fixture.detectChanges();
+        });
+        it('should working', fakeAsync(() => {
+          expect(layoutComp.customContextMenu[0].fn).not.toHaveBeenCalled();
+          page
+            .to('#b')
+            .openContextMenu(1)
+            .clickContentMenu('custom1');
+          expect(layoutComp.customContextMenu[0].fn).toHaveBeenCalled();
+        }));
+        it('should be disabled', fakeAsync(() => {
+          expect(layoutComp.customContextMenu[1].fn).not.toHaveBeenCalled();
+          page
+            .to('#b')
+            .openContextMenu(1)
+            .clickContentMenu('custom2');
+          expect(layoutComp.customContextMenu[1].fn).not.toHaveBeenCalled();
+        }));
+      });
     });
 
     describe('[routing]', () => {
@@ -492,11 +542,144 @@ describe('abc: reuse-tab', () => {
           .expectTime(lTime);
       }));
     });
+
+    describe('#keepingScroll', () => {
+      const KSTIME = 2;
+      let ss: ScrollService;
+      let getScrollPositionSpy: jasmine.Spy;
+      beforeEach(() => {
+        ss = injector.get(ScrollService) as ScrollService;
+        getScrollPositionSpy = spyOn(ss, 'getScrollPosition').and.returnValue([0, 666]);
+        spyOn(ss, 'scrollToPosition');
+      });
+      it('with true', fakeAsync(() => {
+        srv.keepingScroll = true;
+        page
+          .to('#a') // default page, not trigger store
+          .to('#b')
+          .advance(KSTIME)
+          .tap(() => {
+            expect(srv.items[0].position != null).toBe(true);
+            expect(srv.items[0].position[1]).toBe(666);
+            expect(ss.scrollToPosition).not.toHaveBeenCalled();
+          })
+          .to('#a')
+          .advance(KSTIME)
+          .tap(() => {
+            expect(srv.items[1].position != null).toBe(true);
+            expect(srv.items[1].position[1]).toBe(666);
+            expect(ss.scrollToPosition).toHaveBeenCalled();
+          });
+      }));
+      it('with false', fakeAsync(() => {
+        srv.keepingScroll = false;
+        page
+          .to('#a') // default page, not trigger store
+          .to('#b')
+          .advance(KSTIME)
+          .tap(() => {
+            expect(ss.getScrollPosition).not.toHaveBeenCalled();
+          })
+          .to('#a')
+          .advance(KSTIME)
+          .tap(() => {
+            expect(ss.getScrollPosition).not.toHaveBeenCalled();
+          });
+      }));
+      describe('should be delay trigger when has setting scrollPositionRestoration', () => {
+        it('with disabled (not delay)', fakeAsync(() => {
+          const cog = injector.get(ROUTER_CONFIGURATION) as ExtraOptions;
+          cog.scrollPositionRestoration = 'disabled';
+          srv.keepingScroll = true;
+          page
+            .to('#a') // default page, not trigger store
+            .to('#b')
+            .to('#a')
+            .tap(() => {
+              expect(ss.scrollToPosition).toHaveBeenCalled();
+            });
+        }));
+        it('with enabled (must delay)', fakeAsync(() => {
+          const cog = injector.get(ROUTER_CONFIGURATION) as ExtraOptions;
+          cog.scrollPositionRestoration = 'enabled';
+          srv.keepingScroll = true;
+          page
+            .to('#a') // default page, not trigger store
+            .to('#b')
+            .to('#a')
+            .advance(KSTIME)
+            .tap(() => {
+              expect(ss.scrollToPosition).toHaveBeenCalled();
+            });
+        }));
+        it('with top (must delay)', fakeAsync(() => {
+          const cog = injector.get(ROUTER_CONFIGURATION) as ExtraOptions;
+          cog.scrollPositionRestoration = 'top';
+          srv.keepingScroll = true;
+          page
+            .to('#a') // default page, not trigger store
+            .to('#b')
+            .to('#a')
+            .advance(KSTIME)
+            .tap(() => {
+              expect(ss.scrollToPosition).toHaveBeenCalled();
+            });
+        }));
+      });
+      describe('#keepingScrollContainer', () => {
+        beforeEach(() => {
+          const cog = injector.get(ROUTER_CONFIGURATION) as ExtraOptions;
+          cog.scrollPositionRestoration = 'disabled';
+          layoutComp.keepingScroll = true;
+        });
+        it('with window', fakeAsync(() => {
+          layoutComp.keepingScrollContainer = window;
+          fixture.detectChanges();
+          page
+            .to('#a') // default page, not trigger store
+            .to('#b')
+            .advance(KSTIME)
+            .tap(() => {
+              expect(srv.items[0].position != null).toBe(true);
+              expect(srv.items[0].position[1]).toBe(666);
+              expect(getScrollPositionSpy.calls.mostRecent().args[0]).toBe(window);
+            });
+        }));
+        it('with Element', fakeAsync(() => {
+          const el = document.querySelector('#children');
+          layoutComp.keepingScrollContainer = el;
+          fixture.detectChanges();
+          page
+            .to('#a') // default page, not trigger store
+            .to('#b')
+            .advance(KSTIME)
+            .tap(() => {
+              expect(srv.items[0].position != null).toBe(true);
+              expect(srv.items[0].position[1]).toBe(666);
+              expect(getScrollPositionSpy.calls.mostRecent().args[0]).toBe(el);
+            });
+        }));
+        it('with String', fakeAsync(() => {
+          layoutComp.keepingScrollContainer = '#children';
+          fixture.detectChanges();
+          page
+            .to('#a') // default page, not trigger store
+            .to('#b')
+            .advance(KSTIME)
+            .tap(() => {
+              expect(srv.items[0].position != null).toBe(true);
+              expect(srv.items[0].position[1]).toBe(666);
+              expect(getScrollPositionSpy.calls.mostRecent().args[0]).toBe(document.querySelector('#children'));
+            });
+        }));
+      });
+    });
   });
 
   describe('[i18n]', () => {
     it('should be rendered', fakeAsync(() => {
       genModule(true);
+      createComp();
       page.to('#e').expectAttr(1, 'title', 'zh');
 
       i18nResult = 'en';
@@ -506,6 +689,7 @@ describe('abc: reuse-tab', () => {
     }));
     it('#context-menu-text', fakeAsync(() => {
       genModule();
+      createComp();
       page.to('#b').openContextMenu(1);
       expect(document.querySelector('[data-type="close"]').textContent).toBe(
         zh_CN.reuseTab.close,
@@ -516,6 +700,50 @@ describe('abc: reuse-tab', () => {
       expect(document.querySelector('[data-type="close"]').textContent).toBe(
         en_US.reuseTab.close,
       );
+    }));
+  });
+
+  describe('#issues', () => {
+    it('#361', fakeAsync(() => {
+      injector = TestBed.configureTestingModule({
+        declarations: [
+          AppComponent,
+          LayoutComponent,
+          CComponent,
+          DComponent,
+        ],
+        imports: [
+          DelonLocaleModule,
+          ReuseTabModule,
+          RouterTestingModule.withRoutes([
+            {
+              path: '',
+              component: LayoutComponent,
+              children: [
+                { path: 'a', redirectTo: 'c', pathMatch: 'full' },
+                { path: 'b', component: DComponent, data: { title: 'b', reuse: false } },
+                { path: 'c', component: CComponent, data: { title: 'c', reuse: false } },
+                { path: 'd', component: DComponent, data: { title: 'd', reuse: true } },
+              ],
+            },
+          ]),
+        ],
+        providers: [
+          MenuService,
+          { provide: WINDOW, useValue: window },
+          {
+            provide: RouteReuseStrategy,
+            useClass: ReuseTabStrategy,
+            deps: [ReuseTabService],
+          },
+        ],
+      });
+      createComp();
+
+      page.to('#to-d')
+          .to('#to-c')
+          .close(0)
+          .to('#to-d');
     }));
   });
 
@@ -583,7 +811,7 @@ describe('abc: reuse-tab', () => {
       return this;
     }
     go(pos: number): this {
-      const ls = document.querySelectorAll('.name');
+      const ls = document.querySelectorAll('.reuse-tab__name');
       if (pos > ls.length) {
         expect(false).toBe(true, `the pos muse be 0-${ls.length}`);
         return this;
@@ -596,7 +824,7 @@ describe('abc: reuse-tab', () => {
       return this;
     }
     openContextMenu(pos: number, eventArgs?: any): this {
-      const ls = document.querySelectorAll('.name');
+      const ls = document.querySelectorAll('.reuse-tab__name');
       if (pos > ls.length) {
         expect(false).toBe(true, `the pos muse be 0-${ls.length}`);
         return this;
@@ -626,30 +854,34 @@ describe('abc: reuse-tab', () => {
   template: `
     <a id="a" [routerLink]="['/a']">a</a>
     <a id="b" [routerLink]="['/b/1']">b1</a>
-    <a id="c" [routerLink]="['/c']">c</a>
-    <a id="d" [routerLink]="['/d']">d</a>
+    <a id="c" [routerLink]="['/c']">c</a> <a id="d" [routerLink]="['/d']">d</a>
     <a id="e" [routerLink]="['/e']">e</a>
     <a id="leave" [routerLink]="['/leave']">leave</a>
     <router-outlet></router-outlet>
-    `,
+  `,
 })
 class AppComponent {}
 
 @Component({
   template: `
-    <reuse-tab #comp
-        [mode]="mode"
-        [debug]="debug"
-        [max]="max"
-        [debug]="debug"
-        [excludes]="excludes"
-        [allowClose]="allowClose"
-        [showCurrent]="showCurrent"
-        (change)="change($event)"
-        (close)="close($event)">
+    <reuse-tab
+      #comp
+      [mode]="mode"
+      [debug]="debug"
+      [max]="max"
+      [debug]="debug"
+      [excludes]="excludes"
+      [allowClose]="allowClose"
+      [showCurrent]="showCurrent"
+      [keepingScroll]="keepingScroll"
+      [keepingScrollContainer]="keepingScrollContainer"
+      [customContextMenu]="customContextMenu"
+      (change)="change($event)"
+      (close)="close($event)"
+    >
     </reuse-tab>
     <div id="children"><router-outlet></router-outlet></div>
-    `,
+  `,
 })
 class LayoutComponent {
   @ViewChild('comp')
@@ -660,13 +892,19 @@ class LayoutComponent {
   excludes: RegExp[] = [];
   allowClose = true;
   showCurrent = true;
+  keepingScroll = false;
+  keepingScrollContainer = null;
+  customContextMenu: ReuseCustomContextMenu[] = [];
   change() {}
   close() {}
 }
 
 @Component({
   selector: 'a-comp',
-  template: `a:<div id="time">{{time}}</div>`,
+  template: `
+    a:
+    <div id="time">{{ time }}</div>
+  `,
 })
 class AComponent {
   time = +new Date();
@@ -675,10 +913,11 @@ class AComponent {
 @Component({
   selector: 'b-comp',
   template: `
-    b:<div id="time">{{time}}</div>
+    b:
+    <div id="time">{{ time }}</div>
     <a id="b2" [routerLink]="['/b/2']">b2</a>
     <a id="b3" [routerLink]="['/b/3']">b3</a>
-    `,
+  `,
 })
 class BComponent {
   time = +new Date();
@@ -687,7 +926,11 @@ class BComponent {
 
 @Component({
   selector: 'c-comp',
-  template: `c:<div id="time">{{time}}</div>`,
+  template: `
+    c:
+    <div id="time">{{ time }}</div>
+    <a id="to-d" routerLink="/d">to-d</a>
+  `,
 })
 class CComponent {
   time = +new Date();
@@ -698,7 +941,11 @@ class CComponent {
 
 @Component({
   selector: 'd-comp',
-  template: `d:<div id="time">{{time}}</div>`,
+  template: `
+    d:
+    <div id="time">{{ time }}</div>
+    <a id="to-c" routerLink="/c">to-c</a>
+  `,
 })
 class DComponent {
   time = +new Date();
@@ -706,7 +953,10 @@ class DComponent {
 
 @Component({
   selector: 'e-comp',
-  template: `e:<div id="time">{{time}}</div>`,
+  template: `
+    e:
+    <div id="time">{{ time }}</div>
+  `,
 })
 class EComponent {
   time = +new Date();

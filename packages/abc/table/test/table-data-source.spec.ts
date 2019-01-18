@@ -1,15 +1,12 @@
 import { DecimalPipe } from '@angular/common';
+import { of, throwError } from 'rxjs';
 
 import { CNCurrencyPipe, DatePipe, YNPipe } from '@delon/theme';
 import { deepCopy } from '@delon/util';
 
-import {
-  STDataSource,
-  STDataSourceOptions,
-} from '../table-data-source';
+import { STDataSource, STDataSourceOptions } from '../table-data-source';
 import { STConfig } from '../table.config';
 import { STColumnFilterMenu } from '../table.interfaces';
-import { of, throwError } from 'rxjs';
 
 const DEFAULT = {
   pi: 1,
@@ -39,10 +36,11 @@ describe('abc: table: data-souce', () => {
   let datePipe: DatePipe;
   let ynPipe: YNPipe;
   let decimalPipe: DecimalPipe;
+  // tslint:disable-next-line:prefer-const
   let httpResponse: any;
 
   class MockHttpClient {
-    request(method: string, url: string, options: any) {
+    request(method: string, url: string, opt: any) {
       return of(httpResponse);
     }
   }
@@ -76,7 +74,7 @@ describe('abc: table: data-souce', () => {
       datePipe,
       ynPipe,
       decimalPipe,
-      new MockDomSanitizer() as any
+      new MockDomSanitizer() as any,
     );
   }
 
@@ -236,11 +234,11 @@ describe('abc: table: data-souce', () => {
   });
 
   describe('[remote data]', () => {
-    beforeEach(() => {
-      genModule();
-      options.data = '/mockurl';
-    });
     describe('[request params]', () => {
+      beforeEach(() => {
+        genModule();
+        options.data = '/mockurl';
+      });
       it('should be default method to GET', (done: () => void) => {
         options.req.method = undefined;
         let resMethod = '';
@@ -257,8 +255,8 @@ describe('abc: table: data-souce', () => {
         options.req.reName = { pi: 'PI', ps: 'PS' };
         let resParams: any = {};
         spyOn(http, 'request').and.callFake(
-          (method: string, url: string, options: any) => {
-            resParams = options.params;
+          (method: string, url: string, opt: any) => {
+            resParams = opt.params;
             return of([]);
           },
         );
@@ -272,8 +270,8 @@ describe('abc: table: data-souce', () => {
         options.page.zeroIndexed = true;
         let resParams: any = {};
         spyOn(http, 'request').and.callFake(
-          (method: string, url: string, options: any) => {
-            resParams = options.params;
+          (method: string, url: string, opt: any) => {
+            resParams = opt.params;
             return of([]);
           },
         );
@@ -287,8 +285,8 @@ describe('abc: table: data-souce', () => {
         options.req.method = 'post';
         let resBody: any = {};
         spyOn(http, 'request').and.callFake(
-          (method: string, url: string, options: any) => {
-            resBody = options.body;
+          (method: string, url: string, opt: any) => {
+            resBody = opt.body;
             return of([]);
           },
         );
@@ -299,10 +297,14 @@ describe('abc: table: data-souce', () => {
       });
     });
     describe('[response]', () => {
+      beforeEach(() => {
+        genModule();
+        options.data = '/mockurl';
+      });
       it('should be re-name total & list', (done: () => void) => {
         options.res.reName = { total: 'T', list: 'L' };
         spyOn(http, 'request').and.callFake(
-          (method: string, url: string, options: any) => {
+          (method: string, url: string, opt: any) => {
             return of({ L: genData(DEFAULT.ps), T: DEFAULT.ps });
           },
         );
@@ -315,7 +317,7 @@ describe('abc: table: data-souce', () => {
       it('should be invalid re-name config', (done: () => void) => {
         options.res.reName = { total: 'T', list: 'L1' };
         spyOn(http, 'request').and.callFake(
-          (method: string, url: string, options: any) => {
+          (method: string, url: string, opt: any) => {
             return of({ L: genData(DEFAULT.ps), T: DEFAULT.ps });
           },
         );
@@ -328,7 +330,7 @@ describe('abc: table: data-souce', () => {
       it('should be return empty when result is not array', (done: () => void) => {
         options.res.reName = { total: 'T', list: 'L' };
         spyOn(http, 'request').and.callFake(
-          (method: string, url: string, options: any) => {
+          (method: string, url: string, opt: any) => {
             return of({ L: 1, T: DEFAULT.ps });
           },
         );
@@ -342,7 +344,7 @@ describe('abc: table: data-souce', () => {
         options.res.reName = { total: 'T1', list: '1L' };
         options.total = 4;
         spyOn(http, 'request').and.callFake(
-          (method: string, url: string, options: any) => {
+          (method: string, url: string, opt: any) => {
             return of({ L: 1, T: DEFAULT.ps });
           },
         );
@@ -356,7 +358,7 @@ describe('abc: table: data-souce', () => {
         options.res.reName = { total: 'T1', list: '1L' };
         options.total = undefined;
         spyOn(http, 'request').and.callFake(
-          (method: string, url: string, options: any) => {
+          (method: string, url: string, opt: any) => {
             return of({ L: 1, T: DEFAULT.ps });
           },
         );
@@ -368,7 +370,7 @@ describe('abc: table: data-souce', () => {
       });
       it('should be catch response error', (done: () => void) => {
         spyOn(http, 'request').and.callFake(
-          (method: string, url: string, options: any) => {
+          (method: string, url: string, opt: any) => {
             return throwError('aa');
           },
         );
@@ -383,17 +385,32 @@ describe('abc: table: data-souce', () => {
             done();
           });
       });
+      it('should be support array data', (done: () => void) => {
+        spyOn(http, 'request').and.callFake(
+          (method: string, url: string, opt: any) => {
+            return of(genData(DEFAULT.ps));
+          },
+        );
+        srv.process(options).then(res => {
+          expect(res.total).toBe(DEFAULT.ps);
+          expect(res.list.length).toBe(DEFAULT.ps);
+          expect(res.ps).toBe(res.total);
+          done();
+        });
+      });
     });
     describe('[sort]', () => {
       let resParams: any;
       beforeEach(() => {
+        genModule();
+        options.data = '/mockurl';
         options.columns[0]._sort = {
           enabled: true,
           key: 'id',
         };
         spyOn(http, 'request').and.callFake(
-          (method: string, url: string, options: any) => {
-            resParams = options.params;
+          (method: string, url: string, opt: any) => {
+            resParams = opt.params;
             return of([]);
           },
         );
@@ -469,10 +486,30 @@ describe('abc: table: data-souce', () => {
           });
         });
       });
+      describe('[singleSort]', () => {
+        it(`should working`, (done: () => void) => {
+          options.columns[0]._sort.default = 'ascend';
+          options.singleSort = {};
+          srv.process(options).then(res => {
+            expect(resParams.sort).toBe('id.ascend');
+            done();
+          });
+        });
+        it(`should specify options`, (done: () => void) => {
+          options.columns[0]._sort.default = 'ascend';
+          options.singleSort = { key: 'SORT', nameSeparator: '-' };
+          srv.process(options).then(res => {
+            expect(resParams.SORT).toBe('id-ascend');
+            done();
+          });
+        });
+      });
     });
     describe('[filter]', () => {
       let resParams: any;
       beforeEach(() => {
+        genModule();
+        options.data = '/mockurl';
         options.columns[0].filter = {
           default: true,
           key: 'id',
@@ -482,8 +519,8 @@ describe('abc: table: data-souce', () => {
           ],
         };
         spyOn(http, 'request').and.callFake(
-          (method: string, url: string, options: any) => {
-            resParams = options.params;
+          (method: string, url: string, opt: any) => {
+            resParams = opt.params;
             return of([]);
           },
         );
@@ -495,9 +532,7 @@ describe('abc: table: data-souce', () => {
         });
       });
       it(`should be re-name`, (done: () => void) => {
-        options.columns[0].filter.reName = (
-          list: STColumnFilterMenu[],
-        ) => {
+        options.columns[0].filter.reName = (list: STColumnFilterMenu[]) => {
           return { id: list.map(i => i.value + '1').join(',') };
         };
         srv.process(options).then(res => {
@@ -533,6 +568,24 @@ describe('abc: table: data-souce', () => {
         srv.process(options).then(res => {
           expect(res.list[0]._values[0]).toBe(`name 1`);
           done();
+        });
+      });
+      describe('via no', () => {
+        it('with start 1', (done: () => void) => {
+          options.columns[0].type = 'no';
+          options.columns[0].noIndex = 1;
+          srv.process(options).then(res => {
+            expect(res.list[0]._values[0]).toBe(1);
+            done();
+          });
+        });
+        it('with start 0', (done: () => void) => {
+          options.columns[0].type = 'no';
+          options.columns[0].noIndex = 0;
+          srv.process(options).then(res => {
+            expect(res.list[0]._values[0]).toBe(0);
+            done();
+          });
         });
       });
       describe('via img', () => {
@@ -584,6 +637,22 @@ describe('abc: table: data-souce', () => {
           expect(ynPipe.transform).toHaveBeenCalled();
           done();
         });
+      });
+    });
+    it('#rowClassName', (done: () => void) => {
+      options.rowClassName = () => `aaa`;
+      options.data = genData();
+      srv.process(options).then(res => {
+        expect(res.list[0]._rowClassName).toBe('aaa');
+        done();
+      });
+    });
+    it('should be return empty string when is null or undefined', (done: () => void) => {
+      options.data = genData(1);
+      options.columns = [{ title: '', index: 'aa' }];
+      srv.process(options).then(res => {
+        expect(res.list[0]._values[0]).toBe('');
+        done();
       });
     });
   });

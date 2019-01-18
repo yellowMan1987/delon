@@ -1,34 +1,34 @@
-import { Injectable, OnDestroy, Inject } from '@angular/core';
+// tslint:disable:no-any
 import { HttpClient } from '@angular/common/http';
+import { Inject, Injectable, OnDestroy } from '@angular/core';
 import addSeconds from 'date-fns/add_seconds';
-import { Observable, of, BehaviorSubject } from 'rxjs';
-import { tap, map } from 'rxjs/operators';
+import { of, BehaviorSubject, Observable } from 'rxjs';
+import { map, tap } from 'rxjs/operators';
 
+import { DelonCacheConfig } from './cache.config';
 import {
-  DC_STORE_STORAGE_TOKEN,
-  ICacheStore,
-  ICache,
   CacheNotifyResult,
   CacheNotifyType,
+  ICache,
+  ICacheStore,
 } from './interface';
-import { DelonCacheConfig } from './cache.config';
+import { DC_STORE_STORAGE_TOKEN } from './local-storage-cache.service';
 
-@Injectable()
+@Injectable({ providedIn: 'root' })
 export class CacheService implements OnDestroy {
   private readonly memory: Map<string, ICache> = new Map<string, ICache>();
-  private readonly notifyBuffer: Map<
-    string,
-    BehaviorSubject<CacheNotifyResult>
-  > = new Map<string, BehaviorSubject<CacheNotifyResult>>();
+  private readonly notifyBuffer: Map<string, BehaviorSubject<CacheNotifyResult>> = new Map<string, BehaviorSubject<CacheNotifyResult>>();
   private meta: Set<string> = new Set<string>();
-  private freq_tick = 3000;
-  private freq_time: any;
+  private freqTick = 3000;
+  private freqTime;
+  private cog: DelonCacheConfig = {};
 
   constructor(
-    private options: DelonCacheConfig,
+    _: DelonCacheConfig,
     @Inject(DC_STORE_STORAGE_TOKEN) private store: ICacheStore,
     private http: HttpClient,
   ) {
+    Object.assign(this.cog, { ...new DelonCacheConfig(), ..._});
     this.loadMeta();
     this.startExpireNotify();
   }
@@ -57,7 +57,7 @@ export class CacheService implements OnDestroy {
   }
 
   private loadMeta() {
-    const ret = this.store.get(this.options.meta_key);
+    const ret = this.store.get(this.cog.meta_key);
     if (ret && ret.v) {
       (ret.v as string[]).forEach(key => this.meta.add(key));
     }
@@ -66,7 +66,7 @@ export class CacheService implements OnDestroy {
   private saveMeta() {
     const metaData: string[] = [];
     this.meta.forEach(key => metaData.push(key));
-    this.store.set(this.options.meta_key, { v: metaData, e: 0 });
+    this.store.set(this.cog.meta_key, { v: metaData, e: 0 });
   }
 
   getMeta() {
@@ -104,7 +104,7 @@ export class CacheService implements OnDestroy {
    */
   set(
     key: string,
-    data: Object,
+    data: {},
     options?: { type?: 's'; expire?: number },
   ): void;
   /**
@@ -114,7 +114,7 @@ export class CacheService implements OnDestroy {
    */
   set(
     key: string,
-    data: Object,
+    data: {},
     options: { type: 'm' | 's'; expire?: number },
   ): void;
   /**
@@ -152,7 +152,7 @@ export class CacheService implements OnDestroy {
     if (type === 'm') {
       this.memory.set(key, value);
     } else {
-      this.store.set(this.options.prefix + key, value);
+      this.store.set(this.cog.prefix + key, value);
       this.pushMeta(key);
     }
     this.runNotify(key, 'set');
@@ -197,20 +197,16 @@ export class CacheService implements OnDestroy {
       expire?: number;
     } = {},
   ): Observable<any> | any {
-    const isPromise =
-      options.mode !== 'none' && this.options.mode === 'promise';
-    const value: ICache = this.memory.has(key)
-      ? this.memory.get(key)
-      : this.store.get(this.options.prefix + key);
+    const isPromise = options.mode !== 'none' && this.cog.mode === 'promise';
+    const value: ICache = this.memory.has(key) ? this.memory.get(key) : this.store.get(this.cog.prefix + key);
     if (!value || (value.e && value.e > 0 && value.e < new Date().valueOf())) {
       if (isPromise) {
         return this.http
           .get(key)
           .pipe(
-            map((ret: any) =>
-              this._deepGet(ret, this.options.reName as string[], null),
-            ),
-            tap(v => this.set(key, v)),
+            // tslint:disable-next-line:no-any
+            map((ret: any) => this._deepGet(ret, this.cog.reName as string[], null)),
+            tap(v => this.set(key, v, { type: options.type, expire: options.expire })),
           );
       }
       return null;
@@ -247,7 +243,7 @@ export class CacheService implements OnDestroy {
    */
   tryGet(
     key: string,
-    data: Object,
+    data: {},
     options?: { type?: 's'; expire?: number },
   ): any;
   /**
@@ -255,7 +251,7 @@ export class CacheService implements OnDestroy {
    */
   tryGet(
     key: string,
-    data: Object,
+    data: {},
     options: { type: 'm' | 's'; expire?: number },
   ): any;
 
@@ -277,11 +273,11 @@ export class CacheService implements OnDestroy {
     const ret = this.getNone(key);
     if (ret === null) {
       if (!(data instanceof Observable)) {
-        this.set(key, data, <any>options);
+        this.set(key, data, options as any);
         return data;
       }
 
-      return this.set(key, data as Observable<any>, <any>options);
+      return this.set(key, data as Observable<any>, options as any);
     }
     return of(ret);
   }
@@ -305,7 +301,7 @@ export class CacheService implements OnDestroy {
       this.memory.delete(key);
       return;
     }
-    this.store.remove(this.options.prefix + key);
+    this.store.remove(this.cog.prefix + key);
     this.removeMeta(key);
   }
 
@@ -318,7 +314,7 @@ export class CacheService implements OnDestroy {
   clear() {
     this.notifyBuffer.forEach((v, k) => this.runNotify(k, 'remove'));
     this.memory.clear();
-    this.meta.forEach(key => this.store.remove(this.options.prefix + key));
+    this.meta.forEach(key => this.store.remove(this.cog.prefix + key));
   }
 
   // #endregion
@@ -329,7 +325,7 @@ export class CacheService implements OnDestroy {
    * 设置监听频率，单位：毫秒且最低 `20ms`，默认：`3000ms`
    */
   set freq(value: number) {
-    this.freq_tick = Math.max(20, value);
+    this.freqTick = Math.max(20, value);
     this.abortExpireNotify();
     this.startExpireNotify();
   }
@@ -340,10 +336,10 @@ export class CacheService implements OnDestroy {
   }
 
   private runExpireNotify() {
-    this.freq_time = setTimeout(() => {
+    this.freqTime = setTimeout(() => {
       this.checkExpireNotify();
       this.runExpireNotify();
-    }, this.freq_tick);
+    }, this.freqTick);
   }
 
   private checkExpireNotify() {
@@ -358,7 +354,7 @@ export class CacheService implements OnDestroy {
   }
 
   private abortExpireNotify() {
-    clearTimeout(this.freq_time);
+    clearTimeout(this.freqTime);
   }
 
   private runNotify(key: string, type: CacheNotifyType) {

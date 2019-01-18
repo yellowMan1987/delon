@@ -46,8 +46,12 @@ export interface ReuseTabCached {
   /** 是否允许关闭，默认：`true` */
   closable?: boolean;
 
+  /** 当前滚动条位置 */
+  position?: [ number, number ];
+
   _snapshot: ActivatedRouteSnapshot;
 
+  // tslint:disable-next-line:no-any
   _handle: any;
 }
 
@@ -55,6 +59,7 @@ export interface ReuseTabNotify {
   /** 事件类型 */
   active: string;
 
+  // tslint:disable-next-line:no-any
   [key: string]: any;
 }
 
@@ -71,9 +76,10 @@ export interface ReuseContextEvent {
   event: MouseEvent;
   item: ReuseItem;
   comp?: ReuseTabContextComponent;
+  customContextMenu?: ReuseCustomContextMenu[];
 }
 
-export type CloseType = 'close' | 'closeOther' | 'closeRight' | 'clear' | null;
+export type CloseType = 'close' | 'closeOther' | 'closeRight' | 'clear' | 'custom' | null;
 
 export interface ReuseContextCloseEvent {
   type: CloseType;
@@ -86,4 +92,11 @@ export interface ReuseContextI18n {
   closeOther?: string;
   closeRight?: string;
   clear?: string;
+}
+
+export interface ReuseCustomContextMenu {
+  id: string;
+  title: string;
+  fn: (item: ReuseItem, menu: ReuseCustomContextMenu) => void;
+  disabled?: (item: ReuseItem) => boolean;
 }

@@ -4,8 +4,8 @@ import sdk from '@stackblitz/sdk';
 @Injectable({ providedIn: 'root' })
 export class CodeService {
   openOnStackBlitz(code: string, title: string, summary: string) {
-    let selector = '',
-      componentName = '';
+    let selector = '';
+    let componentName = '';
     const selectorRe = /selector:[ ]?(['|"|`])([^'"`]+)/g.exec(code);
     if (selectorRe) {
       selector = selectorRe[2];
@@ -158,13 +158,15 @@ declare var Slider: any;
         'src/index.html': [
           ~isG2
             ? `
-<script type="text/javascript" src="https://gw.alipayobjects.com/os/antv/assets/g2/3.0.5-beta.5/g2.min.js"></script>
-<script type="text/javascript" src="https://gw.alipayobjects.com/os/antv/assets/data-set/0.8.5/data-set.min.js"></script>
+<script type="text/javascript" src="https://gw.alipayobjects.com/os/antv/pkg/_antv.g2-3.4.1/dist/g2.min.js"></script>
+<script type="text/javascript" src="https://gw.alipayobjects.com/os/antv/pkg/_antv.data-set-0.10.1/dist/data-set.min.js"></script>
 <script type="text/javascript" src="https://gw.alipayobjects.com/os/antv/assets/g2-plugin-slider/2.0.0/g2-plugin-slider.js"></script>
 `
             : ``,
 
-          `<${selector}>loading</${selector}>`,
+          `<${selector}>loading</${selector}>
+<div id="VERSION" style="position: fixed; bottom: 8px; right: 8px; z-index: 8888;"></div>
+          `,
         ].join(''),
         'src/main.ts': `import './polyfills';
 
@@ -209,6 +211,7 @@ import { BrowserModule } from '@angular/platform-browser';
 import { FormsModule } from '@angular/forms';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { HttpClientModule } from '@angular/common/http';
+import { RouterModule } from '@angular/router';
 
 import { registerLocaleData } from '@angular/common';
 import localeZh from '@angular/common/locales/zh';
@@ -223,6 +226,8 @@ import { DelonAuthModule } from '@delon/auth';
 import { DelonACLModule } from '@delon/acl';
 import { DelonCacheModule } from '@delon/cache';
 import { DelonUtilModule, LazyService } from '@delon/util';
+import { DelonMockModule } from '@delon/mock';
+import * as MOCKDATA from '../../_mock';
 
 @Injectable()
 export class StartupService {
@@ -230,7 +235,7 @@ export class StartupService {
   load(): Promise<any> {
     return new Promise((resolve, reject) => {
       this.lazy.load([
-        'https://cdn.bootcss.com/ajv/6.4.0/ajv.min.js'
+        'https://cdnjs.cloudflare.com/ajax/libs/ajv/6.6.2/ajv.min.js'
       ])
         .then(() => resolve(null));
     });
@@ -241,6 +246,8 @@ export function StartupServiceFactory(startupService: StartupService): Function 
   return () => startupService.load();
 }
 
+import { VERSION as VERSION_ALAIN } from '@delon/theme';
+import { VERSION as VERSION_ZORRO } from 'ng-zorro-antd';
 import { ${componentName} } from './app.component';
 
 @NgModule({
@@ -249,15 +256,17 @@ imports: [
     FormsModule,
     HttpClientModule,
     BrowserAnimationsModule,
-    NgZorroAntdModule.forRoot(),
+    RouterModule.forRoot([]),
+    NgZorroAntdModule,
     AlainThemeModule.forRoot(),
-    DelonABCModule.forRoot(),
-    DelonChartModule.forRoot(),
-    DelonAuthModule.forRoot(),
-    DelonACLModule.forRoot(),
-    DelonCacheModule.forRoot(),
+    DelonABCModule,
+    DelonChartModule,
+    DelonACLModule,
+    DelonCacheModule,
+    DelonUtilModule,
+    DelonAuthModule,
     DelonFormModule.forRoot(),
-    DelonUtilModule.forRoot(),
+    DelonMockModule.forRoot({ data: MOCKDATA }),
 ],
 providers: [
   StartupService,
@@ -271,40 +280,51 @@ providers: [
 declarations: [ ${componentName} ],
 bootstrap:    [ ${componentName} ]
 })
-export class AppModule { }
+export class AppModule {
+  constructor() {
+    setTimeout(() => {
+      document.querySelector('#VERSION').innerHTML = \`
+      VERSIONS: ng-zorro-antd(\${VERSION_ZORRO.full}), @delon(\${VERSION_ALAIN.full})
+      \`;
+    }, 1000);
+  }
+}
   `,
         'src/styles.less': ``,
+        '_mock/user.ts': require('!!raw-loader!../../../_mock/user.ts'),
+        '_mock/index.ts': `export * from './user';`,
       },
       template: 'angular-cli',
       dependencies: {
-        '@angular/cdk': '^6.0.0',
-        '@angular/core': '^6.0.0',
-        '@angular/forms': '^6.0.0',
-        '@angular/http': '^6.0.0',
-        '@angular/language-service': '^6.0.0',
-        '@angular/platform-browser': '^6.0.0',
-        '@angular/platform-browser-dynamic': '^6.0.0',
-        '@angular/common': '^6.0.0',
-        '@angular/router': '^6.0.0',
-        '@angular/animations': '^6.0.0',
+        '@angular/cdk': '*',
+        '@angular/core': '*',
+        '@angular/forms': '*',
+        '@angular/http': '*',
+        '@angular/language-service': '*',
+        '@angular/platform-browser': '*',
+        '@angular/platform-browser-dynamic': '*',
+        '@angular/common': '*',
+        '@angular/router': '*',
+        '@angular/animations': '*',
+        '@ant-design/icons-angular': '*',
         'date-fns': '*',
         'file-saver': '^1.3.3',
         'ngx-countdown': '*',
-        'ng-zorro-antd': '*',
-        '@delon/theme': '^2.0.0-beta.0',
-        '@delon/abc': '^2.0.0-beta.0',
-        '@delon/chart': '^2.0.0-beta.0',
-        '@delon/acl': '^2.0.0-beta.0',
-        '@delon/auth': '^2.0.0-beta.0',
-        '@delon/cache': '^2.0.0-beta.0',
-        '@delon/mock': '^2.0.0-beta.0',
-        '@delon/form': '^2.0.0-beta.0',
-        '@delon/util': '^2.0.0-beta.0',
+        'ng-zorro-antd': '^7.0.0-rc.1',
+        '@delon/theme': 'latest',
+        '@delon/abc': 'latest',
+        '@delon/chart': 'latest',
+        '@delon/acl': 'latest',
+        '@delon/auth': 'latest',
+        '@delon/cache': 'latest',
+        '@delon/mock': 'latest',
+        '@delon/form': 'latest',
+        '@delon/util': 'latest',
         'extend': '*',
         'qrious': '*',
       },
     }, {
-      openFile: `src/app/app.component.ts`
-    });
+        openFile: `src/app/app.component.ts`,
+      });
   }
 }

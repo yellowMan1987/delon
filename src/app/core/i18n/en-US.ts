@@ -3,6 +3,7 @@ export const ENUS = {
     'app.header.search': 'Search in ng-alain.com',
     'app.home.preview': 'Preview',
     'app.home.start': 'Start',
+    'app.home.slogan': 'Out-of-box UI solution for enterprise applications, Let developers focus on business.',
     'app.header.menu.home': 'Home',
     'app.header.menu.docs': 'Docs',
     'app.header.menu.components': 'Components',
@@ -19,6 +20,7 @@ export const ENUS = {
     'app.header.menu.cli': 'ng-alain Schematics',
     'app.header.menu.tool': 'Tools',
     'app.header.menu.upgrade': 'HTML Upgrade Tool',
+    'app.header.menu.themes': 'Themes',
     'app.header.lang': '中文',
     'app.footer.resources': 'Resources',
     'app.footer.angular': '中文网',
@@ -40,5 +42,5 @@ export const ENUS = {
     'app.component.config.title': 'General Configuration',
     'app.demo.copy': 'Copy code',
     'app.demo.copied': 'Copied!',
-    'app.demo.stackblitz': 'Open in StackBlitz'
+    'app.demo.stackblitz': 'Open in StackBlitz',
 };

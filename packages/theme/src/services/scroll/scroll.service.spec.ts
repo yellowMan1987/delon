@@ -1,14 +1,14 @@
-import { ReflectiveInjector } from '@angular/core';
-import { DOCUMENT } from '@angular/platform-browser';
+import { DOCUMENT } from '@angular/common';
+import { Injector, StaticProvider } from '@angular/core';
 
-import { ScrollService } from './scroll.service';
 import { WINDOW } from '../../win_tokens';
+import { ScrollService } from './scroll.service';
 
 describe('Service: Scroll', () => {
   const topOfPageElem = {} as Element;
-  let injector: ReflectiveInjector;
+  let injector: Injector;
   let window: any;
-  let document: MockDocument;
+  let doc: MockDocument;
   let scrollService: ScrollService;
 
   class MockElement {
@@ -16,6 +16,7 @@ describe('Service: Scroll', () => {
       .createSpy('Element getBoundingClientRect')
       .and.returnValue({ top: 0 });
     scrollIntoView = jasmine.createSpy('Element scrollIntoView');
+    scrollTo = jasmine.createSpy('Element scrollTo');
   }
 
   class MockDocument {
@@ -29,18 +30,51 @@ describe('Service: Scroll', () => {
   describe('[default]', () => {
     class MockWindow {
       scrollBy() {}
+      scrollTo() {}
     }
     beforeEach(() => {
-      injector = ReflectiveInjector.resolveAndCreate([
-        ScrollService,
-        { provide: WINDOW, useClass: MockWindow },
-        { provide: DOCUMENT, useClass: MockDocument },
-      ]);
+      const providers = [
+        { provide: ScrollService, useClass: ScrollService, deps: [WINDOW, DOCUMENT] },
+        { provide: WINDOW, useClass: MockWindow, deps: [] },
+        { provide: DOCUMENT, useClass: MockDocument, deps: [] },
+      ] as StaticProvider[];
+      injector = Injector.create({ providers });
       window = injector.get(WINDOW);
-      document = injector.get(DOCUMENT);
+      doc = injector.get(DOCUMENT) as any;
       scrollService = injector.get(ScrollService);
 
       spyOn(window, 'scrollBy');
+      spyOn(window, 'scrollTo');
+    });
+
+    describe('#getScrollPosition', () => {
+      it('with HTMLElement', () => {
+        const element: Element = new MockElement() as any;
+        element.scrollLeft = 10;
+        element.scrollTop = 11;
+        const position = scrollService.getScrollPosition(element);
+        expect(position[0]).toBe(10);
+        expect(position[1]).toBe(11);
+      });
+      it('with Window', () => {
+        window.pageXOffset = 10;
+        window.pageYOffset = 11;
+        const position = scrollService.getScrollPosition();
+        expect(position[0]).toBe(10);
+        expect(position[1]).toBe(11);
+      });
+    });
+
+    describe('#scrollToPosition', () => {
+      it('with HTMLElement', () => {
+        const element: Element = new MockElement() as any;
+        scrollService.scrollToPosition(element, [10, 11]);
+        expect(element.scrollTo).toHaveBeenCalledWith(10, 11);
+      });
+      it('with Window', () => {
+        scrollService.scrollToPosition(null, [10, 11]);
+        expect(window.scrollTo).toHaveBeenCalledWith(10, 11);
+      });
     });
 
     describe('#scrollToElement', () => {
@@ -108,13 +142,14 @@ describe('Service: Scroll', () => {
       scrollBy = null;
     }
     beforeEach(() => {
-      injector = ReflectiveInjector.resolveAndCreate([
-        ScrollService,
-        { provide: WINDOW, useClass: MockWindow },
-        { provide: DOCUMENT, useClass: MockDocument },
-      ]);
+      const providers = [
+        { provide: ScrollService, useClass: ScrollService, deps: [WINDOW, DOCUMENT] },
+        { provide: WINDOW, useClass: MockWindow, deps: [] },
+        { provide: DOCUMENT, useClass: MockDocument, deps: [] },
+      ] as StaticProvider[];
+      injector = Injector.create({ providers });
       window = injector.get(WINDOW);
-      document = injector.get(DOCUMENT);
+      doc = injector.get(DOCUMENT) as any;
       scrollService = injector.get(ScrollService);
     });
     it('should only use scrollIntoView', () => {

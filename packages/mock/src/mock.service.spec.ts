@@ -1,10 +1,10 @@
 import { Injector } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import * as Mock from 'mockjs';
-import { MockService } from './mock.service';
-import { DelonMockConfig } from './mock.config';
 import { DelonMockModule } from '../index';
 import { MockRequest } from './interface';
+import { DelonMockConfig } from './mock.config';
+import { MockService } from './mock.service';
 
 const DATA = {
   USERS: {
@@ -67,6 +67,10 @@ describe('mock: service', () => {
       expect(rule).not.toBeNull();
       expect(rule.method).toBe('GET');
       expect(rule.url).toBe('/users/2');
+    });
+
+    it('should be starts with URL in route param', () => {
+      expect(srv.getRule('GET', '/org/users/2')).toBeNull();
     });
 
     it('should be support regex', () => {

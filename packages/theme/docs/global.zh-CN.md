@@ -12,10 +12,12 @@ title: 全局参数
 | `@font-size-base` | `14px` | antd字号 |
 | `@primary-color` | 蓝色 | antd 主色 |
 | `@mobile-min` | `768px` | PC端 |
-| `@mobile-max` | `768px` | 移动端 |
-| `@text-sm` | `@font-size-base + 0` | 小号文本 |
-| `@text-md` | `@font-size-base + 2` | 中号文本 |
-| `@text-lg` | `@font-size-base + 4` | 大号文本 |
+| `@mobile-max` | `767px` | 移动端 |
+| `@text-xs` | `@font-size-base - 2` | xs 文本大小 |
+| `@text-sm` | `@font-size-base + 0` | sm 文本大小 |
+| `@text-md` | `@font-size-base + 2` | md 文本大小 |
+| `@text-lg` | `@font-size-base + 4` | lg 文本大小 |
+| `@text-xl` | `@font-size-base + 8` | xl 文本大小 |
 | `@icon-sm` | `@font-size-base * 2` | 小号图标 |
 | `@icon-md` | `@font-size-base * 4` | 中号图标 |
 | `@icon-lg` | `@font-size-base * 6` | 大号图标 |
@@ -45,6 +47,19 @@ title: 全局参数
 | `@scrollbar-height` | `6px` | 美化滚动条高度 |
 | `@scrollbar-track-color` | `rgba(0, 0, 0, 0.3)` | 美化滚动条的轨道颜色 |
 | `@scrollbar-thumb-color` | `#6e6e6e` | 美化滚动条小方块颜色 |
+| `@scrollbar-table-enabled` | `false` | 启用美化表格滚动条 |
+
+## Ng补丁
+
+### 通用
+
+| 名称 | 默认值 | 功能 |
+| --- | --- | --- |
+| `@preserve-white-spaces-enabled` | `true` | 解决开启 [preserveWhitespaces](https://angular.io/api/core/Component#preserveWhitespaces) 时按钮间可能会出现无缝  |
+| `@preserve-sf-and-st-spaces` | `16px` | `sf` 与 `st` 间间距 |
+| `@preserve-buttons-spaces` | 按钮间间距（包括：button、button-group、popconfirm） |
+| `@router-animation-duration` | `antFadeIn` | 路由切换动画 |
+| `@router-animation-duration` | `1s` | 路由切换动画时长 |
 
 ## Zorro组件补丁
 
@@ -52,9 +67,7 @@ title: 全局参数
 
 | 名称 | 默认值 | 功能 |
 | --- | --- | --- |
-| `@preserve-white-spaces-enabled` | `true` | 开启 `preserveWhitespaces` |
-| `@router-animation-duration` | `antFadeIn` | 路由切换动画 |
-| `@router-animation-duration` | `1s` | 路由切换动画时长 |
+| `@forced-turn-off-nz-modal-animation-enabled` | `false` | 强制关闭 `nz-modal` 动画效果 |
 
 ### 表单
 
@@ -83,3 +96,15 @@ title: 全局参数
 | `@nz-table-rep-column-name-text-align` | `right` | 表格响应式：列名文本对齐方式 |
 | `@nz-table-rep-column-name-padding-right` | `right` | 表格响应式：列名右间距 |
 | `@nz-table-rep-column-name-color` | `rgba(0, 0, 0, 0.5)` | 表格响应式：列名颜色 |
+
+## 小部件
+
+| 名称 | 默认值 | 功能 |
+| --- | --- | --- |
+| `@badge-enabled` | `true` | bootstrap徽章 |
+| `@hafl-enabled` | `true` | 半图 |
+| `@abs-enabled` | `true` | 中心元素 |
+| `@masonry-enabled` | `true` | CSS瀑布流列 |
+| `@setting-drawer-enabled` | `true` | 主题设置 |
+| `@search-form-enabled` | `true` | 简化搜索框，[DEMO](https://ng-alain.github.io/ng-alain/) |
+| `@search__form-enabled` | `true` | Pro搜索框，[DEMO](https://ng-alain.github.io/ng-alain/) |

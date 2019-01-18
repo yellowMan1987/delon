@@ -1,14 +1,14 @@
 import { SchematicTestRunner, UnitTestTree } from '@angular-devkit/schematics/testing';
+import * as fs from 'fs';
 import { createAlainAndModuleApp } from '../utils/testing';
 import { Schema as NgAddOptions } from './schema';
-import * as fs from 'fs';
 
 describe('Schematic: tpl', () => {
   let runner: SchematicTestRunner;
   let tree: UnitTestTree;
 
   function run() {
-    tree = runner.runSchematic('tpl', { name: 'edit', module: 'trade' }, tree);
+    tree = runner.runSchematic('tpl', { name: 'edit', module: 'trade', modal: true }, tree);
   }
 
   beforeEach(() => ({ runner, tree } = createAlainAndModuleApp()));

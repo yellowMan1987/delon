@@ -1,47 +1,50 @@
-import { Injector, Component, DebugElement, ViewChild } from '@angular/core';
-import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import { By } from '@angular/platform-browser';
-import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
+import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
+import { Component, DebugElement, Injector, Type, ViewChild } from '@angular/core';
 import {
-  TestBed,
-  ComponentFixture,
-  fakeAsync,
   discardPeriodicTasks,
+  fakeAsync,
+  tick,
+  ComponentFixture,
+  TestBed,
 } from '@angular/core/testing';
-import { HttpClientTestingModule } from '@angular/common/http/testing';
-import { RouterTestingModule } from '@angular/router/testing';
+import { FormsModule } from '@angular/forms';
+import { By } from '@angular/platform-browser';
+import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { Router } from '@angular/router';
+import { RouterTestingModule } from '@angular/router/testing';
 import { of, Observable, Subject } from 'rxjs';
 
-import { NgZorroAntdModule, NzPaginationComponent } from 'ng-zorro-antd';
-import { ModalHelper, ALAIN_I18N_TOKEN, DatePipe } from '@delon/theme';
-import { deepCopy, deepGet } from '@delon/util';
-import {
+import { en_US, ALAIN_I18N_TOKEN,
+  DatePipe,
   DelonLocaleModule,
-  en_US,
-  zh_CN,
   DelonLocaleService,
+  ModalHelper,
 } from '@delon/theme';
+import { deepCopy, deepGet } from '@delon/util';
+import { NgZorroAntdModule, NzPaginationComponent } from 'ng-zorro-antd';
 
+import { configureTestSuite, dispatchDropDown } from '@delon/testing';
 import {
+  AlainI18NService,
+  AlainI18NServiceFake,
+} from '../../../theme/src/services/i18n/i18n';
+import { STDataSource } from '../table-data-source';
+import { STExport } from '../table-export';
+import { STComponent } from '../table.component';
+import { STConfig } from '../table.config';
+import {
+  STChange,
   STColumn,
-  STMultiSort,
   STColumnBadge,
-  STColumnTag,
-  STPage,
-  STRes,
   STColumnFilter,
+  STColumnTag,
+  STMultiSort,
+  STPage,
+  STReq,
+  STRes,
 } from '../table.interfaces';
 import { STModule } from '../table.module';
-import { STComponent } from '../table.component';
-import {
-  AlainI18NServiceFake,
-  AlainI18NService,
-} from '../../../theme/src/services/i18n/i18n';
-import { dispatchDropDown } from '../../../testing';
-import { STExport } from '../table-export';
-import { STDataSource } from '../table-data-source';
 
 const MOCKDATE = new Date();
 const MOCKIMG = `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+P+/HgAFhAJ/wlseKgAAAABJRU5ErkJggg==`;
@@ -74,7 +77,7 @@ const PS = 3;
 const DEFAULTCOUNT = PS + 1;
 const USERS: any[] = genData(DEFAULTCOUNT);
 
-let i18nResult = 'zh';
+const i18nResult = 'zh';
 class MockI18NServiceFake extends AlainI18NServiceFake {
   fanyi(key: string) {
     return i18nResult;
@@ -88,44 +91,59 @@ describe('abc: table', () => {
   let dl: DebugElement;
   let page: PageObject;
   let comp: STComponent;
+  let i18nSrv: AlainI18NService;
 
   function genModule(other: {
     template?: string;
     i18n?: boolean;
     minColumn?: boolean;
     providers?: any[];
+    createComp?: boolean;
   }) {
+    other = {
+      template: '',
+      i18n: false,
+      minColumn: false,
+      providers: [],
+      createComp: true,
+      ...other,
+    };
     const imports = [
       NoopAnimationsModule,
       CommonModule,
       FormsModule,
       HttpClientTestingModule,
       RouterTestingModule.withRoutes([]),
-      NgZorroAntdModule.forRoot(),
-      STModule.forRoot(),
+      NgZorroAntdModule,
+      STModule,
       DelonLocaleModule,
     ];
-    const providers = [];
-    if (other.providers && other.providers.length) {
+    const providers = [{
+      provide: ALAIN_I18N_TOKEN,
+      useClass: MockI18NServiceFake,
+    }];
+    if (other.providers.length > 0) {
       providers.push(...other.providers);
-    }
-    if (other.i18n) {
-      providers.push(<any>{
-        provide: ALAIN_I18N_TOKEN,
-        useClass: MockI18NServiceFake,
-      });
     }
     injector = TestBed.configureTestingModule({
       imports,
-      declarations: [TestComponent],
+      declarations: [TestComponent, TestExpandComponent],
       providers,
     });
     if (other.template) TestBed.overrideTemplate(TestComponent, other.template);
-    fixture = TestBed.createComponent(TestComponent);
+    // ALAIN_I18N_TOKEN 默认为 root 会导致永远都会存在
+    i18nSrv = injector.get(ALAIN_I18N_TOKEN);
+    if (other.createComp) {
+      createComp(other.minColumn, TestComponent);
+    }
+  }
+
+  function createComp<T extends TestComponent>(minColumn = false, type: Type<T>) {
+    fixture = TestBed.createComponent(type);
     dl = fixture.debugElement;
     context = dl.componentInstance;
     context.data = deepCopy(USERS);
-    if (other.minColumn) {
+    if (minColumn) {
       context.columns = [{ title: '', index: 'id' }];
     }
     page = new PageObject();
@@ -133,15 +151,10 @@ describe('abc: table', () => {
 
   afterEach(() => comp.ngOnDestroy());
 
-  describe('[property]', () => {
+  describe('', () => {
+    configureTestSuite(() => genModule({ createComp: false }));
+    beforeEach(() => createComp(true, TestComponent));
     describe('#columns', () => {
-      beforeEach(() => genModule({}));
-      it('should be render', (done: () => void) => {
-        page.newColumn([{ title: '', index: 'id' }]).then(() => {
-          page.expectCell('1');
-          done();
-        });
-      });
       describe('[type]', () => {
         describe(`with checkbox`, () => {
           it(`should be render checkbox`, (done: () => void) => {
@@ -172,7 +185,6 @@ describe('abc: table', () => {
               .then(() => {
                 page.click('.st__checkall');
                 expect(comp._data.filter(w => w.checked).length).toBe(PS);
-                expect(context.checkboxChange).toHaveBeenCalled();
                 page.click('.st__checkall');
                 expect(comp._data.filter(w => w.checked).length).toBe(0);
                 done();
@@ -352,8 +364,7 @@ describe('abc: table', () => {
             page
               .newColumn([{ title: '', index: 'id', type: 'currency' }])
               .then(() => {
-                page;
-                page.getCell().classList.contains('text-right');
+                expect(page.getCell().classList).toContain('text-right');
                 done();
               });
           });
@@ -386,8 +397,7 @@ describe('abc: table', () => {
             page
               .newColumn([{ title: '', index: 'num', type: 'number' }])
               .then(() => {
-                page;
-                page.getCell().classList.contains('text-right');
+                expect(page.getCell().classList).toContain('text-right');
                 done();
               });
           });
@@ -422,8 +432,7 @@ describe('abc: table', () => {
             page
               .newColumn([{ title: '', index: 'date', type: 'date' }])
               .then(() => {
-                page;
-                page.getCell().classList.contains('text-right');
+                expect(page.getCell().classList).toContain('text-center');
                 done();
               });
           });
@@ -560,7 +569,7 @@ describe('abc: table', () => {
           page
             .newColumn([{ title: '', index: 'id', className: 'asdf' }])
             .then(() => {
-              page.getCell().classList.contains('asdf');
+              expect(page.getCell().classList).toContain('asdf');
               done();
             });
         });
@@ -573,7 +582,6 @@ describe('abc: table', () => {
               buttons: [
                 { text: 'del', type: 'del' },
                 {
-                  text: 'del',
                   type: 'del',
                   click: jasmine.createSpy(),
                   popTitle: 'confirm?',
@@ -634,6 +642,7 @@ describe('abc: table', () => {
           page.newColumn(columns).then(() => {
             // mock trigger
             comp._btnClick(null, comp._data[0], comp._columns[0].buttons[0]);
+            expect(true).toBe(true);
             done();
           });
         });
@@ -781,6 +790,23 @@ describe('abc: table', () => {
                 done();
               });
             });
+            it('should be include route state when return a string value', (done: () => void) => {
+              const columns: STColumn[] = [
+                {
+                  title: '',
+                  buttons: [
+                    { text: 'a', type: 'link', click: (item: any) => '/a' },
+                  ],
+                },
+              ];
+              const router = injector.get(Router);
+              const spy = spyOn(router, 'navigateByUrl');
+              page.newColumn(columns).then(() => {
+                page.clickCell('a');
+                expect(spy.calls.mostRecent().args[1].state.pi).toBe(1);
+                done();
+              });
+            });
           });
         });
       });
@@ -815,9 +841,12 @@ describe('abc: table', () => {
         });
       });
     });
-    describe('#data', () => {
+    describe('[data source]', () => {
+      let httpBed: HttpTestingController;
+      beforeEach(() => {
+        httpBed = injector.get(HttpTestingController);
+      });
       it('support null data', (done: () => void) => {
-        genModule({ minColumn: true });
         context.data = null;
         fixture.detectChanges();
         fixture
@@ -833,26 +862,44 @@ describe('abc: table', () => {
             done();
           });
       });
+      it('should only restore data', () => {
+        // tslint:disable-next-line:no-string-literal
+        const dataSource: STDataSource = comp['dataSource'];
+        spyOn(dataSource, 'process').and.callFake(() => Promise.resolve({}));
+        fixture.detectChanges();
+        expect(comp.ps).toBe(PS);
+      });
+      it('should be automatically cancel paging when the returned body value is an array type', (done) => {
+        context.pi = 1;
+        context.ps = 2;
+        context.data = '/mock';
+        fixture.detectChanges();
+        httpBed.expectOne(req => true).flush([ {}, {}, {} ]);
+        fixture.whenStable().then(() => {
+          expect(comp.pi).toBe(1);
+          expect(comp.ps).toBe(3);
+          expect(comp._isPagination).toBe(false);
+          done();
+        });
+      });
     });
     describe('#req', () => {
-      beforeEach(() => genModule({ minColumn: true }));
-      it('should be keep reName valid', () => {
-        context.req = { reName: null };
+      it('should fix all paraments when only part parament', () => {
+        context.req = { reName: { pi: 'PI' } };
         fixture.detectChanges();
         expect(comp.req.reName).not.toBeNull();
-        expect(comp.req.reName.pi).toBe('pi');
+        expect(comp.req.reName.pi).toBe('PI');
         expect(comp.req.reName.ps).toBe('ps');
       });
     });
     describe('#res', () => {
-      beforeEach(() => genModule({ minColumn: true }));
-      it('should be keep reName valid', () => {
-        context.res = { reName: null };
+      it('should fix all paraments when only part parament', () => {
+        context.res = { reName: { total: 'a.b' } };
         fixture.detectChanges();
         expect(comp.res.reName).not.toBeNull();
-        expect(Array.isArray(comp.res.reName.total)).toBe(true);
-        expect(Array.isArray(comp.res.reName.list)).toBe(true);
-        expect(comp.res.reName.total[0]).toBe('total');
+        expect(comp.res.reName.total[0]).toBe('a');
+        expect(comp.res.reName.total[1]).toBe('b');
+        expect(comp.res.reName.list.length).toBe(1);
         expect(comp.res.reName.list[0]).toBe('list');
       });
       it('support a.b', () => {
@@ -867,31 +914,15 @@ describe('abc: table', () => {
         expect(comp.res.reName.list[1]).toBe('d');
       });
     });
-    describe('#multiSort', () => {
-      beforeEach(() => genModule({ minColumn: true }));
-      it('with true', () => {
-        context.multiSort = true;
+    describe('#page', () => {
+      it('should fix all paraments when only part parament', () => {
+        context.page = { total: `TO:{{total}}` };
         fixture.detectChanges();
-        const ms: STMultiSort = comp.multiSort;
-        expect(typeof ms).toBe('object');
-        expect(ms.key).toBe('sort');
-      });
-      it('with false', () => {
-        context.multiSort = false;
-        fixture.detectChanges();
-        const ms: STMultiSort = comp.multiSort;
-        expect(ms).toBeNull();
-      });
-      it('with object', () => {
-        context.multiSort = { key: 'aa' };
-        fixture.detectChanges();
-        const ms: STMultiSort = comp.multiSort;
-        expect(typeof ms).toBe('object');
-        expect(ms.key).toBe('aa');
+        expect(comp.page.placement).toBe(`right`);
+        expect(comp.page.total).toBe(`TO:{{total}}`);
       });
     });
     describe('#showTotal', () => {
-      beforeEach(() => genModule({ minColumn: true }));
       it('with true', (done: () => void) => {
         context.page.total = true;
         fixture.detectChanges();
@@ -926,7 +957,6 @@ describe('abc: table', () => {
       });
     });
     describe('#showPagination', () => {
-      beforeEach(() => genModule({ minColumn: true }));
       describe('with undefined', () => {
         beforeEach(() => {
           context.ps = 2;
@@ -959,7 +989,6 @@ describe('abc: table', () => {
       });
     });
     describe('#pagePlacement', () => {
-      beforeEach(() => genModule({ minColumn: true }));
       ['left', 'center', 'right'].forEach(pos => {
         it(`with ${pos}`, (done: () => void) => {
           context.page.placement = pos as any;
@@ -972,7 +1001,6 @@ describe('abc: table', () => {
       });
     });
     describe('#responsiveHideHeaderFooter', () => {
-      beforeEach(() => genModule({ minColumn: true }));
       it('should working', done => {
         context.responsiveHideHeaderFooter = true;
         fixture.detectChanges();
@@ -984,7 +1012,6 @@ describe('abc: table', () => {
     });
     describe('#toTop', () => {
       beforeEach(() => {
-        genModule({ minColumn: true });
         context.page.toTopOffset = 10;
       });
       it('with true', (done: () => void) => {
@@ -1029,6 +1056,462 @@ describe('abc: table', () => {
           });
       });
     });
+    describe('#expand', () => {
+      beforeEach(() => {
+        createComp(true, TestExpandComponent);
+      });
+      describe('should be expanded when click row if expandRowByClick', () => {
+        it('with true', (done) => {
+          context.expandRowByClick = true;
+          fixture.detectChanges();
+          fixture.whenStable().then(() => {
+            const el = page.getCell(1, 2);
+            page.expectData(1, 'expand', undefined);
+            el.click();
+            page.expectData(1, 'expand', true);
+            done();
+          });
+        });
+        it('with false', (done) => {
+          context.expandRowByClick = false;
+          fixture.detectChanges();
+          fixture.whenStable().then(() => {
+            const el = page.getCell(1, 2);
+            page.expectData(1, 'expand', undefined);
+            el.click();
+            page.expectData(1, 'expand', undefined);
+            done();
+          });
+        });
+      });
+    });
+    describe('[filter]', () => {
+      describe('in local-data', () => {
+        let filter: STColumnFilter;
+        let firstCol: STColumn;
+        beforeEach(() => {
+          context.columns = [
+            {
+              title: '',
+              index: 'i',
+              filter: {
+                multiple: true,
+                menus: [
+                  { text: 'f1', value: 'fv1' },
+                  { text: 'f2', value: 'fv2' },
+                ],
+                confirmText: 'ok',
+                clearText: 'reset',
+                icon: 'aa',
+                fn: () => true,
+              },
+            },
+          ];
+        });
+        it('muse provide the fn function', (done: () => void) => {
+          spyOn(console, 'warn');
+          context.columns[0].filter.fn = null;
+          fixture.detectChanges();
+          firstCol = comp._columns[0];
+          filter = firstCol.filter;
+          comp._filterRadio(firstCol, filter.menus[0], true);
+          comp._filterRadio(firstCol, filter.menus[1], true);
+          comp._filterConfirm(firstCol);
+          fixture.detectChanges();
+          fixture.whenStable().then(() => {
+            expect(console.warn).toHaveBeenCalled();
+            done();
+          });
+        });
+        describe('when is single', () => {
+          beforeEach(() => {
+            context.columns[0].filter.multiple = false;
+            fixture.detectChanges();
+            firstCol = comp._columns[0];
+            filter = firstCol.filter;
+            comp._filterRadio(firstCol, filter.menus[0], true);
+            comp._filterRadio(firstCol, filter.menus[1], true);
+            comp._filterConfirm(firstCol);
+          });
+          it('should be filter', () => {
+            const res = filter.menus.filter(w => w.checked);
+            expect(res.length).toBe(1);
+          });
+          it('should be clean', () => {
+            comp.clearFilter();
+            const res = filter.menus.filter(w => w.checked);
+            expect(res.length).toBe(0);
+          });
+        });
+        describe('when is multiple', () => {
+          beforeEach(() => {
+            context.columns[0].filter.multiple = true;
+            fixture.detectChanges();
+            firstCol = comp._columns[0];
+            filter = firstCol.filter;
+            filter.menus[0].checked = true;
+            filter.menus[1].checked = true;
+            comp._filterConfirm(firstCol);
+          });
+          it('should be filter', () => {
+            const res = filter.menus.filter(w => w.checked);
+            expect(res.length).toBe(2);
+          });
+          it('should be clean', () => {
+            comp._filterClear(firstCol);
+            const res = filter.menus.filter(w => w.checked);
+            expect(res.length).toBe(0);
+          });
+        });
+      });
+    });
+    describe('[sort]', () => {
+      describe('in local-data', () => {
+        beforeEach(() => {
+          context.columns = [
+            {
+              title: '',
+              index: 'i',
+              sort: { default: 'ascend', compare: () => 1 },
+            },
+            {
+              title: '',
+              index: 'i',
+              sort: { default: 'descend', compare: () => 1 },
+            },
+          ];
+        });
+        describe('when single-sort', () => {
+          beforeEach(() => (context.multiSort = false));
+          it('muse provide the compare function', (done: () => void) => {
+            spyOn(console, 'warn');
+            context.columns = [{ title: '', index: 'i', sort: true }];
+            fixture.detectChanges();
+            comp.sort(comp._columns[0], 0, 'descend');
+            fixture.detectChanges();
+            fixture.whenStable().then(() => {
+              expect(console.warn).toHaveBeenCalled();
+              done();
+            });
+          });
+          it('should be sorting', () => {
+            fixture.detectChanges();
+            comp.sort(comp._columns[0], 0, 'descend');
+            const sortList = comp._columns
+              .filter(
+                item => item._sort && item._sort.enabled && item._sort.default,
+              )
+              .map(item => item._sort);
+            expect(sortList.length).toBe(1);
+            expect(sortList[0].default).toBe('descend');
+          });
+        });
+        describe('when multi-sort', () => {
+          beforeEach(() => (context.multiSort = true));
+          it('should be sorting', () => {
+            fixture.detectChanges();
+            comp.sort(comp._columns[0], 0, 'descend');
+            comp.sort(comp._columns[1], 0, 'ascend');
+            const sortList = comp._columns
+              .filter(
+                item => item._sort && item._sort.enabled && item._sort.default,
+              )
+              .map(item => item._sort);
+            expect(sortList.length).toBe(2);
+            expect(sortList[0].default).toBe('descend');
+            expect(sortList[1].default).toBe('ascend');
+          });
+        });
+      });
+    });
+    describe('[row events]', () => {
+      beforeEach(fakeAsync(() => {
+        context.rowClickTime = 10;
+        fixture.detectChanges();
+        tick();
+      }));
+      it(`should be row click`, fakeAsync(() => {
+        (page.getCell() as HTMLElement).click();
+        fixture.detectChanges();
+        tick(100);
+        expect(page._changeData.type).toBe('click');
+      }));
+      it(`should be row double click`, fakeAsync(() => {
+        const cell = page.getCell() as HTMLElement;
+        cell.click();
+        cell.click();
+        fixture.detectChanges();
+        tick(100);
+        expect(page._changeData.type).toBe('dblClick');
+      }));
+      it('should be ingore input', fakeAsync(() => {
+        expect(context.change).not.toHaveBeenCalled();
+        const el = page.getCell() as HTMLElement;
+        // mock input nodeName
+        spyOnProperty(el, 'nodeName', 'get').and.returnValue('INPUT');
+        el.click();
+        fixture.detectChanges();
+        tick(100);
+        expect(context.change).not.toHaveBeenCalled();
+      }));
+    });
+    describe('[public method]', () => {
+      describe('#load', () => {
+        it('nothing specified', () => {
+          expect(context.change).not.toHaveBeenCalled();
+          fixture.detectChanges();
+          comp.load();
+          expect(context.change).toHaveBeenCalled();
+        });
+        it(`can specify page number`, () => {
+          expect(context.change).not.toHaveBeenCalled();
+          fixture.detectChanges();
+          comp.load(2);
+          expect(context.change).toHaveBeenCalled();
+          expect(comp.pi).toBe(2);
+        });
+        it(`can specify extra params`, () => {
+          expect(context.change).not.toHaveBeenCalled();
+          fixture.detectChanges();
+          comp.load(1, { a: 1 });
+          expect(context.change).toHaveBeenCalled();
+          expect(comp.req.params.a).toBe(1);
+        });
+        it('shoule be keeping extra params when do not passed', () => {
+          comp.load(1, { a: 1 });
+          expect(comp.req.params.a).toBe(1);
+          comp.load(1);
+          expect(comp.req.params.a).toBe(1);
+        });
+        it('shoule be merge extra params', () => {
+          comp.load(1, { a: 1 });
+          comp.load(1, { b: 2 }, { merge: true });
+          expect(comp.req.params.a).toBe(1);
+          expect(comp.req.params.b).toBe(2);
+        });
+        it('can\'t contaminate raw data', () => {
+          const params: any = { a: 1 };
+          context.req = { params };
+          fixture.detectChanges();
+          comp.load(1, { b: 2 }, { merge: true });
+          expect(comp.req.params.a).toBe(1);
+          expect(comp.req.params.b).toBe(2);
+          expect(params.b).toBeUndefined();
+        });
+      });
+      describe('#reload', () => {
+        it('keeping current page index', () => {
+          fixture.detectChanges();
+          comp.load(2);
+          expect(comp.pi).toBe(2);
+          comp.reload();
+          expect(comp.pi).toBe(2);
+        });
+        it('without extra params', () => {
+          expect(context.change).not.toHaveBeenCalled();
+          const orgExtraParams = comp.req.params;
+          fixture.detectChanges();
+          comp.reload();
+          expect(context.change).toHaveBeenCalled();
+          expect(comp.req.params).toBe(orgExtraParams);
+        });
+        it(`with extra params`, () => {
+          expect(context.change).not.toHaveBeenCalled();
+          fixture.detectChanges();
+          comp.reload({ a: 1 });
+          expect(context.change).toHaveBeenCalled();
+          expect(comp.req.params.a).toBe(1);
+        });
+        it('merge extra params', () => {
+          comp.reload({ a: 1 });
+          comp.reload({ b: 2 }, { merge: true });
+          expect(comp.req.params.a).toBe(1);
+          expect(comp.req.params.b).toBe(2);
+        });
+      });
+      describe('#reset', () => {
+        it('always the first page', () => {
+          fixture.detectChanges();
+          comp.load(2);
+          expect(comp.pi).toBe(2);
+          comp.reset();
+          expect(comp.pi).toBe(1);
+        });
+        it('without extra params', () => {
+          expect(context.change).not.toHaveBeenCalled();
+          const orgExtraParams = comp.req.params;
+          fixture.detectChanges();
+          comp.reset();
+          expect(context.change).toHaveBeenCalled();
+          expect(comp.req.params).toBe(orgExtraParams);
+          expect(comp.pi).toBe(1);
+        });
+        it(`with extra params`, () => {
+          expect(context.change).not.toHaveBeenCalled();
+          fixture.detectChanges();
+          comp.reset({ a: 1 });
+          expect(context.change).toHaveBeenCalled();
+          expect(comp.req.params.a).toBe(1);
+          expect(comp.pi).toBe(1);
+        });
+        it('merge extra params', () => {
+          comp.reset({ a: 1 });
+          comp.reset({ b: 2 }, { merge: true });
+          expect(comp.req.params.a).toBe(1);
+          expect(comp.req.params.b).toBe(2);
+        });
+        it('should be clean check, radio, filter, sort', fakeAsync(() => {
+          spyOn(comp, 'clearCheck').and.returnValue(comp);
+          spyOn(comp, 'clearRadio').and.returnValue(comp);
+          spyOn(comp, 'clearFilter').and.returnValue(comp);
+          spyOn(comp, 'clearSort').and.returnValue(comp);
+          comp.reset();
+          expect(comp.clearCheck).toHaveBeenCalled();
+          expect(comp.clearRadio).toHaveBeenCalled();
+          expect(comp.clearFilter).toHaveBeenCalled();
+          expect(comp.clearSort).toHaveBeenCalled();
+        }));
+      });
+      describe('#removeRow', () => {
+        it('shoule be working', done => {
+          fixture.detectChanges();
+          fixture.whenStable().then(() => {
+            page.expectCurrentPageTotal(PS);
+            comp.removeRow(comp._data[0]);
+            page.expectCurrentPageTotal(PS - 1);
+            done();
+          });
+        });
+        it('shoule be recalculate no value', done => {
+          page.newColumn([ { title: '', type: 'no' } ]).then(() => {
+            page.expectCurrentPageTotal(PS);
+            comp._data.forEach((v, idx) => expect(v._values[0]).toBe(idx + 1));
+            comp.removeRow(comp._data[0]);
+            comp._data.forEach((v, idx) => expect(v._values[0]).toBe(idx + 1));
+            done();
+          });
+        });
+        it('shoule be ingored invalid data', done => {
+          fixture.detectChanges();
+          fixture.whenStable().then(() => {
+            page.expectCurrentPageTotal(PS);
+            comp.removeRow([null]);
+            page.expectCurrentPageTotal(PS);
+            done();
+          });
+        });
+      });
+      describe('#clean', () => {
+        beforeEach(() => {
+          spyOn(comp, 'clearCheck').and.returnValue(comp);
+          spyOn(comp, 'clearRadio').and.returnValue(comp);
+          spyOn(comp, 'clearFilter').and.returnValue(comp);
+          spyOn(comp, 'clearSort').and.returnValue(comp);
+          fixture.detectChanges();
+        });
+        it('#clear', (done) => {
+          fixture.whenStable().then(() => {
+            expect(comp._data.length).toBe(PS);
+            comp.clear();
+            expect(comp._data.length).toBe(0);
+            done();
+          });
+        });
+        it('#clear, excludes clean status', (done) => {
+          fixture.whenStable().then(() => {
+            expect(comp._data.length).toBe(PS);
+            expect(comp.clearCheck).not.toHaveBeenCalled();
+            comp.clear(false);
+            expect(comp._data.length).toBe(0);
+            expect(comp.clearCheck).not.toHaveBeenCalled();
+            done();
+          });
+        });
+        it('#clearStatus', () => {
+          expect(comp.clearCheck).not.toHaveBeenCalled();
+          comp.clearStatus();
+          expect(comp.clearCheck).toHaveBeenCalled();
+        });
+      });
+    });
+    describe('#export', () => {
+      let exportSrv: STExport;
+      beforeEach(() => {
+        // tslint:disable-next-line:no-string-literal
+        exportSrv = comp['exportSrv'] = {
+          export: jasmine.createSpy('export'),
+        } as any;
+      });
+      describe('without specified data', () => {
+        it('when data is array data', () => {
+          context.data = genData(1);
+          fixture.detectChanges();
+          expect(exportSrv.export).not.toHaveBeenCalled();
+          comp.export();
+          expect(exportSrv.export).toHaveBeenCalled();
+        });
+        it('when data is observable data', () => {
+          context.data = of(genData(1));
+          fixture.detectChanges();
+          expect(exportSrv.export).not.toHaveBeenCalled();
+          comp.export();
+          expect(exportSrv.export).toHaveBeenCalled();
+        });
+      });
+      describe('with specified data', () => {
+        it('should be specified array data', () => {
+          expect(exportSrv.export).not.toHaveBeenCalled();
+          comp.export([], {});
+          expect(exportSrv.export).toHaveBeenCalled();
+        });
+      });
+    });
+    describe('#multiSort', () => {
+      it('with true', () => {
+        context.multiSort = true;
+        fixture.detectChanges();
+        const ms: STMultiSort = comp.multiSort;
+        expect(typeof ms).toBe('object');
+      });
+      it('with false', () => {
+        context.multiSort = false;
+        fixture.detectChanges();
+        const ms: STMultiSort = comp.multiSort;
+        expect(ms).toBeNull();
+      });
+      it('with object', () => {
+        context.multiSort = { key: 'aa' };
+        fixture.detectChanges();
+        const ms: STMultiSort = comp.multiSort;
+        expect(typeof ms).toBe('object');
+        expect(ms.key).toBe('aa');
+      });
+    });
+  });
+
+  describe('**slow**', () => {
+    describe('#multiSort', () => {
+      it('should default is mulit sorting by config', () => {
+        genModule({
+          minColumn: true, providers: [{
+            provide: STConfig,
+            useValue: Object.assign(new STConfig(), { multiSort: { global: true } } as STConfig),
+          }],
+        });
+        const ms: STMultiSort = comp.multiSort;
+        expect(ms).not.toBeUndefined();
+      });
+      it('should default non-mulit sorting by config', () => {
+        genModule({
+          minColumn: true, providers: [{
+            provide: STConfig,
+            useValue: Object.assign(new STConfig(), { multiSort: { global: false } } as STConfig),
+          }],
+        });
+        const ms: STMultiSort = comp.multiSort;
+        expect(ms).toBeUndefined();
+      });
+    });
     describe('[custom render template]', () => {
       it('with column title', (done: () => void) => {
         genModule({
@@ -1068,421 +1551,41 @@ describe('abc: table', () => {
         });
       });
     });
-  });
-
-  describe('[public method]', () => {
-    describe('#load', () => {
-      beforeEach(() => genModule({ minColumn: true }));
-      it('nothing specified', () => {
-        expect(context.change).not.toHaveBeenCalled();
-        fixture.detectChanges();
-        comp.load();
-        expect(context.change).toHaveBeenCalled();
-      });
-      it(`can specify page number`, () => {
-        expect(context.change).not.toHaveBeenCalled();
-        fixture.detectChanges();
-        comp.load(2);
-        expect(context.change).toHaveBeenCalled();
-        expect(comp.pi).toBe(2);
-      });
-      it(`can specify extra params`, () => {
-        expect(context.change).not.toHaveBeenCalled();
-        fixture.detectChanges();
-        comp.load(1, { a: 1 });
-        expect(context.change).toHaveBeenCalled();
-        expect(comp.req.params.a).toBe(1);
-      });
-      it('shoule be keeping extra params when do not passed', () => {
-        comp.load(1, { a: 1 });
-        expect(comp.req.params.a).toBe(1);
-        comp.load(1);
-        expect(comp.req.params.a).toBe(1);
-      });
-      it('shoule be merge extra params', () => {
-        comp.load(1, { a: 1 });
-        comp.load(1, { b: 2 }, { merge: true });
-        expect(comp.req.params.a).toBe(1);
-        expect(comp.req.params.b).toBe(2);
-      });
-    });
-    describe('#reload', () => {
-      beforeEach(() => genModule({ minColumn: true }));
-      it('keeping current page index', () => {
-        fixture.detectChanges();
-        comp.load(2);
-        expect(comp.pi).toBe(2);
-        comp.reload();
-        expect(comp.pi).toBe(2);
-      });
-      it('without extra params', () => {
-        expect(context.change).not.toHaveBeenCalled();
-        const orgExtraParams = comp.req.params;
-        fixture.detectChanges();
-        comp.reload();
-        expect(context.change).toHaveBeenCalled();
-        expect(comp.req.params).toBe(orgExtraParams);
-      });
-      it(`with extra params`, () => {
-        expect(context.change).not.toHaveBeenCalled();
-        fixture.detectChanges();
-        comp.reload({ a: 1 });
-        expect(context.change).toHaveBeenCalled();
-        expect(comp.req.params.a).toBe(1);
-      });
-      it('merge extra params', () => {
-        comp.reload({ a: 1 });
-        comp.reload({ b: 2 }, { merge: true });
-        expect(comp.req.params.a).toBe(1);
-        expect(comp.req.params.b).toBe(2);
-      });
-    });
-    describe('#reset', () => {
-      beforeEach(() => genModule({ minColumn: true }));
-      it('always the first page', () => {
-        fixture.detectChanges();
-        comp.load(2);
-        expect(comp.pi).toBe(2);
-        comp.reset();
-        expect(comp.pi).toBe(1);
-      });
-      it('without extra params', () => {
-        expect(context.change).not.toHaveBeenCalled();
-        const orgExtraParams = comp.req.params;
-        fixture.detectChanges();
-        comp.reset();
-        expect(context.change).toHaveBeenCalled();
-        expect(comp.req.params).toBe(orgExtraParams);
-        expect(comp.pi).toBe(1);
-      });
-      it(`with extra params`, () => {
-        expect(context.change).not.toHaveBeenCalled();
-        fixture.detectChanges();
-        comp.reset({ a: 1 });
-        expect(context.change).toHaveBeenCalled();
-        expect(comp.req.params.a).toBe(1);
-        expect(comp.pi).toBe(1);
-      });
-      it('merge extra params', () => {
-        comp.reset({ a: 1 });
-        comp.reset({ b: 2 }, { merge: true });
-        expect(comp.req.params.a).toBe(1);
-        expect(comp.req.params.b).toBe(2);
-      });
-      it('should be clean check, radio, filter, sort', fakeAsync(() => {
-        spyOn(comp, 'clearCheck').and.returnValue(comp);
-        spyOn(comp, 'clearRadio').and.returnValue(comp);
-        spyOn(comp, 'clearFilter').and.returnValue(comp);
-        spyOn(comp, 'clearSort').and.returnValue(comp);
-        comp.reset();
-        expect(comp.clearCheck).toHaveBeenCalled();
-        expect(comp.clearRadio).toHaveBeenCalled();
-        expect(comp.clearFilter).toHaveBeenCalled();
-        expect(comp.clearSort).toHaveBeenCalled();
-      }));
-    });
-    describe('#export', () => {
-      let exportSrv: STExport;
+    describe('[i18n]', () => {
+      let curLang = 'en';
       beforeEach(() => {
-        genModule({ minColumn: true, providers: [STExport] });
-        fixture.detectChanges();
-        exportSrv = comp['exportSrv'];
-        spyOn(exportSrv, 'export');
+        genModule({ i18n: true });
+        spyOn(i18nSrv, 'fanyi').and.callFake(() => curLang);
       });
-      describe('without specified data', () => {
-        it('when data is array data', () => {
-          context.data = genData(1);
+      it('should working', (done: () => void) => {
+        page.newColumn([{ title: '', i18n: curLang, index: 'id' }]).then(() => {
+          const el = page.getEl('.ant-pagination-total-text');
+          expect(el.textContent.trim()).toContain(`共`);
+          injector.get(DelonLocaleService).setLocale(en_US);
           fixture.detectChanges();
-          expect(exportSrv.export).not.toHaveBeenCalled();
-          comp.export();
-          expect(exportSrv.export).toHaveBeenCalled();
-        });
-        it('when data is observable data', () => {
-          context.data = of(genData(1));
-          fixture.detectChanges();
-          expect(exportSrv.export).not.toHaveBeenCalled();
-          comp.export();
-          expect(exportSrv.export).toHaveBeenCalled();
-        });
-      });
-      describe('with specified data', () => {
-        it('should be specified array data', () => {
-          expect(exportSrv.export).not.toHaveBeenCalled();
-          comp.export([], {});
-          expect(exportSrv.export).toHaveBeenCalled();
-        });
-      });
-    });
-    describe('#removeRow', () => {
-      beforeEach(() => {
-        genModule({ minColumn: true });
-        fixture.detectChanges();
-      });
-      it('shoule be working', done => {
-        fixture.whenStable().then(() => {
-          page.expectCurrentPageTotal(PS);
-          comp.removeRow(comp._data[0]);
-          page.expectCurrentPageTotal(PS - 1);
+          expect(el.textContent.trim()).toContain(`of`);
           done();
         });
       });
-      it('shoule be ingored invalid data', done => {
-        fixture.whenStable().then(() => {
-          page.expectCurrentPageTotal(PS);
-          comp.removeRow([null]);
-          page.expectCurrentPageTotal(PS);
+      it('should be re-render columns when i18n changed', (done: () => void) => {
+        curLang = 'en';
+        page.newColumn([{ title: '', i18n: curLang, index: 'id' }]).then(() => {
+          page.expectHead(curLang, 'id');
+          curLang = 'zh';
+          i18nSrv.use(curLang);
+          fixture.detectChanges();
+          page.expectHead(curLang, 'id');
           done();
-        });
-      });
-    });
-  });
-
-  describe('[row events]', () => {
-    beforeEach((done: () => void) => {
-      genModule({ minColumn: true });
-      context.rowClickTime = 10;
-      fixture.detectChanges();
-      fixture.whenStable().then(() => done());
-    });
-    it(`should be row click`, (done: () => void) => {
-      expect(context.rowClick).not.toHaveBeenCalled();
-      expect(context.rowDblClick).not.toHaveBeenCalled();
-      (page.getCell() as HTMLElement).click();
-      fixture.detectChanges();
-      fixture.whenStable().then(() => {
-        setTimeout(() => {
-          expect(context.rowClick).toHaveBeenCalled();
-          expect(context.rowDblClick).not.toHaveBeenCalled();
-          done();
-        }, 25);
-      });
-    });
-    it(`should be row double click`, (done: () => void) => {
-      expect(context.rowClick).not.toHaveBeenCalled();
-      expect(context.rowDblClick).not.toHaveBeenCalled();
-      const cell = page.getCell() as HTMLElement;
-      cell.click();
-      cell.click();
-      fixture.detectChanges();
-      fixture.whenStable().then(() => {
-        setTimeout(() => {
-          expect(context.rowClick).not.toHaveBeenCalled();
-          expect(context.rowDblClick).toHaveBeenCalled();
-          done();
-        }, 25);
-      });
-    });
-    it('should be ingore input', (done: () => void) => {
-      expect(context.rowClick).not.toHaveBeenCalled();
-      expect(context.rowDblClick).not.toHaveBeenCalled();
-      const el = page.getCell() as HTMLElement;
-      // mock input nodeName
-      spyOnProperty(el, 'nodeName', 'get').and.returnValue('INPUT');
-      el.click();
-      fixture.detectChanges();
-      fixture.whenStable().then(() => {
-        setTimeout(() => {
-          expect(context.rowClick).not.toHaveBeenCalled();
-          expect(context.rowDblClick).not.toHaveBeenCalled();
-          done();
-        }, 25);
-      });
-    });
-  });
-
-  describe('[i18n]', () => {
-    let i18nSrv: AlainI18NService;
-    let curLang = 'en';
-    beforeEach(() => {
-      genModule({ i18n: true });
-      i18nSrv = injector.get(ALAIN_I18N_TOKEN);
-      spyOn(i18nSrv, 'fanyi').and.callFake(() => curLang);
-    });
-    it('should working', (done: () => void) => {
-      page.newColumn([{ title: '', i18n: curLang, index: 'id' }]).then(() => {
-        const el = page.getEl('.ant-pagination-total-text');
-        expect(el.textContent.trim()).toContain(`共`);
-        injector.get(DelonLocaleService).setLocale(en_US);
-        fixture.detectChanges();
-        expect(el.textContent.trim()).toContain(`of`);
-        done();
-      });
-    });
-    it('should be re-render columns when i18n changed', (done: () => void) => {
-      page.newColumn([{ title: '', i18n: curLang, index: 'id' }]).then(() => {
-        page.expectHead(curLang, 'id');
-        curLang = 'zh';
-        i18nSrv.use(curLang);
-        fixture.detectChanges();
-        page.expectHead(curLang, 'id');
-        done();
-      });
-    });
-  });
-
-  describe('[data source]', () => {
-    it('should only restore data', () => {
-      genModule({ minColumn: true });
-      let dataSource: STDataSource = comp['dataSource'];
-      spyOn(dataSource, 'process').and.callFake(() => Promise.resolve({}));
-      fixture.detectChanges();
-      expect(comp.ps).toBe(PS);
-    });
-  });
-
-  describe('[sort]', () => {
-    describe('in local-data', () => {
-      beforeEach(() => {
-        genModule({});
-        context.columns = [
-          {
-            title: '',
-            index: 'i',
-            sort: { default: 'ascend', compare: () => 1 },
-          },
-          {
-            title: '',
-            index: 'i',
-            sort: { default: 'descend', compare: () => 1 },
-          },
-        ];
-      });
-      describe('when single-sort', () => {
-        beforeEach(() => (context.multiSort = false));
-        it('muse provide the compare function', (done: () => void) => {
-          spyOn(console, 'warn');
-          context.columns = [{ title: '', index: 'i', sort: true }];
-          fixture.detectChanges();
-          comp.sort(comp._columns[0], 0, 'descend');
-          fixture.detectChanges();
-          fixture.whenStable().then(() => {
-            expect(console.warn).toHaveBeenCalled();
-            done();
-          });
-        });
-        it('should be sorting', () => {
-          fixture.detectChanges();
-          comp.sort(comp._columns[0], 0, 'descend');
-          const sortList = comp._columns
-            .filter(
-              item => item._sort && item._sort.enabled && item._sort.default,
-            )
-            .map(item => item._sort);
-          expect(sortList.length).toBe(1);
-          expect(sortList[0].default).toBe('descend');
-        });
-      });
-      describe('when multi-sort', () => {
-        beforeEach(() => (context.multiSort = true));
-        it('should be sorting', () => {
-          fixture.detectChanges();
-          comp.sort(comp._columns[0], 0, 'descend');
-          comp.sort(comp._columns[1], 0, 'ascend');
-          const sortList = comp._columns
-            .filter(
-              item => item._sort && item._sort.enabled && item._sort.default,
-            )
-            .map(item => item._sort);
-          expect(sortList.length).toBe(2);
-          expect(sortList[0].default).toBe('descend');
-          expect(sortList[1].default).toBe('ascend');
-        });
-      });
-    });
-  });
-
-  describe('[filter]', () => {
-    describe('in local-data', () => {
-      let filter: STColumnFilter;
-      let firstCol: STColumn;
-      beforeEach(() => {
-        genModule({});
-        context.columns = [
-          {
-            title: '',
-            index: 'i',
-            filter: {
-              multiple: true,
-              menus: [
-                { text: 'f1', value: 'fv1' },
-                { text: 'f2', value: 'fv2' },
-              ],
-              confirmText: 'ok',
-              clearText: 'reset',
-              icon: 'aa',
-              fn: () => true,
-            },
-          },
-        ];
-      });
-      it('muse provide the fn function', (done: () => void) => {
-        spyOn(console, 'warn');
-        context.columns[0].filter.fn = null;
-        fixture.detectChanges();
-        firstCol = comp._columns[0];
-        filter = firstCol.filter;
-        comp._filterRadio(firstCol, filter.menus[0], true);
-        comp._filterRadio(firstCol, filter.menus[1], true);
-        comp._filterConfirm(firstCol);
-        fixture.detectChanges();
-        fixture.whenStable().then(() => {
-          expect(console.warn).toHaveBeenCalled();
-          done();
-        });
-      });
-      describe('when is single', () => {
-        beforeEach(() => {
-          context.columns[0].filter.multiple = false;
-          fixture.detectChanges();
-          firstCol = comp._columns[0];
-          filter = firstCol.filter;
-          comp._filterRadio(firstCol, filter.menus[0], true);
-          comp._filterRadio(firstCol, filter.menus[1], true);
-          comp._filterConfirm(firstCol);
-        });
-        it('should be filter', () => {
-          const res = filter.menus.filter(w => w.checked);
-          expect(res.length).toBe(1);
-        });
-        it('should be clean', () => {
-          comp.clearFilter();
-          const res = filter.menus.filter(w => w.checked);
-          expect(res.length).toBe(0);
-        });
-      });
-      describe('when is multiple', () => {
-        beforeEach(() => {
-          context.columns[0].filter.multiple = true;
-          fixture.detectChanges();
-          firstCol = comp._columns[0];
-          filter = firstCol.filter;
-          filter.menus[0].checked = true;
-          filter.menus[1].checked = true;
-          comp._filterConfirm(firstCol);
-        });
-        it('should be filter', () => {
-          const res = filter.menus.filter(w => w.checked);
-          expect(res.length).toBe(2);
-        });
-        it('should be clean', () => {
-          comp._filterClear(firstCol);
-          const res = filter.menus.filter(w => w.checked);
-          expect(res.length).toBe(0);
         });
       });
     });
   });
 
   class PageObject {
+    _changeData: STChange;
     constructor() {
       spyOn(context, 'error');
-      spyOn(context, 'change');
-      spyOn(context, 'checkboxChange');
-      spyOn(context, 'radioChange');
-      spyOn(context, 'sortChange');
-      spyOn(context, 'filterChange');
-      spyOn(context, 'rowClick');
-      spyOn(context, 'rowDblClick');
+      spyOn(context, 'change').and.callFake(e => this._changeData = e);
       comp = context.comp;
     }
     get(cls: string): DebugElement {
@@ -1681,15 +1784,8 @@ describe('abc: table', () => {
         [widthConfig]="widthConfig"
         [rowClickTime]="rowClickTime"
 
-        (change)="change()"
+        (change)="change($event)"
         (error)="error()"
-
-        (checkboxChange)="checkboxChange()"
-        (radioChange)="radioChange()"
-        (sortChange)="sortChange()"
-        (filterChange)="filterChange()"
-        (rowClick)="rowClick()"
-        (rowDblClick)="rowDblClick()"
     >
     </st>`,
 })
@@ -1698,7 +1794,7 @@ class TestComponent {
   comp: STComponent;
   data: string | any[] | Observable<any[]> = deepCopy(USERS);
   res: STRes = {};
-  req: STRes = {};
+  req: STReq = {};
   columns: STColumn[];
   ps = PS;
   pi: number;
@@ -1714,14 +1810,23 @@ class TestComponent {
   widthConfig: string[];
   rowClickTime = 200;
   responsiveHideHeaderFooter = false;
+  expandRowByClick = false;
 
-  error() {}
-  change() {}
+  error() { }
+  change() { }
+}
 
-  checkboxChange() {}
-  radioChange() {}
-  sortChange() {}
-  filterChange() {}
-  rowClick() {}
-  rowDblClick() {}
+@Component({
+  template: `
+    <st #st
+        [data]="data"
+        [columns]="columns"
+        [expand]="expand"
+        [expandRowByClick]="expandRowByClick">
+    <ng-template #expand let-item let-index="index" let-column="column">
+      {{ item.id }}
+    </ng-template>
+    </st>`,
+})
+class TestExpandComponent extends TestComponent {
 }

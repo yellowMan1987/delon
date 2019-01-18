@@ -10,7 +10,7 @@ The ng-alain 2.0 changed is mainly demonstrated from two aspects:
 - Make CURD operations more "natural" development experience([#588](https://github.com/ng-alain/ng-alain/issues/588))
 - More friendly responsive development
 
-Original `simpel-table`, `sf` is popular with developer, so ng-alain 2.0 refactors and new three Simple series components:
+Original `simple-table`, `sf` is popular with developer, so ng-alain 2.0 refactors and new three Simple series components:
 
 - [st](/components/table) <= `simple-table`
   - Input attribute changes, if you use **general configuration priority**, that changes will be much less
@@ -159,12 +159,12 @@ e.g:
 | `[isPageIndexReset]`  | `page`     | `indexReset`      | √         | -        | -    |
 | `[toTopInChange]`     | `page`     | `toTop`           | √         | -        | -    |
 | `[toTopOffset]`       | `page`     | `toTopOffset`     | √         | -        | -    |
-| `(checkboxChange)`    | `(change)` | -                 | √         | √        | Error reminder    |
-| `(radioChange)`       | `(change)` | -                 | √         | √        | Error reminder    |
-| `(sortChange)`        | `(change)` | -                 | √         | √        | Error reminder    |
-| `(filterChange)`      | `(change)` | -                 | √         | √        | Error reminder    |
-| `(rowClick)`          | `(change)` | -                 | √         | √        | Error reminder    |
-| `(rowDblClick)`       | `(change)` | -                 | √         | √        | Error reminder    |
+| `(checkboxChange)`    | `(change)` | -                 | √         | ×        | Error reminder    |
+| `(radioChange)`       | `(change)` | -                 | √         | ×        | Error reminder    |
+| `(sortChange)`        | `(change)` | -                 | √         | ×        | Error reminder    |
+| `(filterChange)`      | `(change)` | -                 | √         | ×        | Error reminder    |
+| `(rowClick)`          | `(change)` | -                 | √         | ×        | Error reminder    |
+| `(rowDblClick)`       | `(change)` | -                 | √         | ×        | Error reminder    |
 
 > A demo [#diff](https://github.com/ng-alain/ng-alain/pull/673/files#diff-f573fc0900f21b377dac432f1668c584L164)
 

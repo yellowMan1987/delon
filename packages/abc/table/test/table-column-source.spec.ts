@@ -1,13 +1,13 @@
 import { ACLService } from '@delon/acl';
-import { AlainI18NServiceFake, AlainI18NService } from '@delon/theme';
+import { AlainI18NService, AlainI18NServiceFake } from '@delon/theme';
 import { deepGet } from '@delon/util';
 
 import { STColumnSource } from '../table-column-source';
 import { STRowSource } from '../table-row.directive';
-import { STColumn } from '../table.interfaces';
 import { STConfig } from '../table.config';
+import { STColumn } from '../table.interfaces';
 
-let i18nResult = 'zh';
+const i18nResult = 'zh';
 class MockI18NServiceFake extends AlainI18NServiceFake {
   fanyi(key: string) {
     return i18nResult;
@@ -68,6 +68,22 @@ describe('abc: table: column-souce', () => {
       });
     });
     describe('[type]', () => {
+      describe(`with no`, () => {
+        it('should be working', () => {
+          const res = srv.process([
+            { title: '', type: 'no' },
+          ]);
+          expect(res[0].type).toBe('no');
+          expect(res[0].noIndex).toBe(1);
+        });
+        it('should be start zero', () => {
+          const res = srv.process([
+            { title: '', type: 'no', noIndex: 0 },
+          ]);
+          expect(res[0].type).toBe('no');
+          expect(res[0].noIndex).toBe(0);
+        });
+      });
       describe(`with checkbox`, () => {
         it('should be keep an empty list', () => {
           const res = srv.process([
@@ -510,11 +526,13 @@ describe('abc: table: column-souce', () => {
       });
       it('should be restore render row elementref', () => {
         expect(rowSrv.getRow).not.toHaveBeenCalled();
+        // tslint:disable-next-line:no-unused-expression
         srv.process([{ title: '', render: 'a' }])[0];
         expect(rowSrv.getRow).toHaveBeenCalled();
       });
       it('should be restore render title elementref', () => {
         expect(rowSrv.getTitle).not.toHaveBeenCalled();
+        // tslint:disable-next-line:no-unused-expression
         srv.process([{ title: '', renderTitle: 'a' }])[0];
         expect(rowSrv.getTitle).toHaveBeenCalled();
       });
@@ -634,7 +652,7 @@ describe('abc: table: column-souce', () => {
   });
 
   describe('[i18n]', () => {
-    let curLang = 'en';
+    const curLang = 'en';
     beforeEach(() => {
       genModule({ i18n: true });
       spyOn(i18nSrv, 'fanyi').and.callFake(() => curLang);
@@ -655,6 +673,14 @@ describe('abc: table: column-souce', () => {
       ]);
       expect(i18nSrv.fanyi).toHaveBeenCalled();
     });
+  });
+
+  it('should be merge default config', () => {
+    genModule({ cog: { size: 'lg'} });
+    const res = srv.process([
+      { title: '', buttons: [ { text: '', type: 'modal', modal: { component: {} } } ] },
+    ]);
+    expect(res[0].buttons[0].modal.paramsName).toBe('record');
   });
 
   class PageObject {

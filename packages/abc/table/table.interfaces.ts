@@ -1,6 +1,7 @@
-import { STComponent } from './table.component';
-import { ModalHelperOptions, DrawerHelperOptions } from '@delon/theme';
+// tslint:disable:no-any
+import { DrawerHelperOptions, ModalHelperOptions } from '@delon/theme';
 import { ModalOptionsForService, NzDrawerOptions } from 'ng-zorro-antd';
+import { STComponent } from './table.component';
 
 export interface STReq {
   /**
@@ -138,6 +139,7 @@ export interface STColumn {
   index?: string | string[];
   /**
    * 类型
+   * - `no` 行号，计算规则：`index + noIndex`
    * - `checkbox` 多选
    * - `radio` 单选
    * - `link` 链接，务必指定 `click`
@@ -150,20 +152,21 @@ export interface STColumn {
    * - `yn` 将`boolean`类型徽章化 [document](https://ng-alain.com/docs/data-render#yn)
    */
   type?:
-    | 'checkbox'
-    | 'link'
-    | 'badge'
-    | 'tag'
-    | 'radio'
-    | 'img'
-    | 'currency'
-    | 'number'
-    | 'date'
-    | 'yn';
+  | 'checkbox'
+  | 'link'
+  | 'badge'
+  | 'tag'
+  | 'radio'
+  | 'img'
+  | 'currency'
+  | 'number'
+  | 'date'
+  | 'yn'
+  | 'no';
   /**
    * 链接回调，若返回一个字符串表示导航URL会自动触发 `router.navigateByUrl`
    */
-  click?: (record: any, instance?: STComponent) => any;
+  click?: (record: STData, instance?: STComponent) => any;
   /**
    * 按钮组
    */
@@ -187,7 +190,7 @@ export interface STColumn {
   /**
    * 列宽（数字型表示 `px` 值），例如：`100`、`10%`、`100px`
    *
-   * **注意：** 固定列不支持百分比
+   * **注意：** 若固定列必须是数字
    */
   width?: string | number;
   /**
@@ -203,7 +206,7 @@ export interface STColumn {
   /**
    * 格式化列值
    */
-  format?: Function;
+  format?: (item: STData, col: STColumn) => string;
   /**
    * 自定义全/反选选择项
    */
@@ -255,6 +258,11 @@ export interface STColumn {
    * 标签配置项
    */
   tag?: STColumnTag;
+  /**
+   * 行号索引，默认：`1`
+   * - 计算规则为：`index + noIndex`
+   */
+  noIndex?: number;
 
   [key: string]: any;
 }
@@ -267,7 +275,7 @@ export interface STColumnSort {
   /**
    * 本地数据的排序函数，使用一个函数(参考 [Array.sort](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/sort) 的 compareFunction)
    */
-  compare?: (a: any, b: any) => number;
+  compare?: (a: STData, b: STData) => number;
   /**
    * 远程数据的排序时后端相对应的KEY，默认使用 `index` 属性
    * - 若 `multiSort: false` 时：`key: 'name' => ?name=1&pi=1`
@@ -290,7 +298,7 @@ export interface STColumnFilter {
   /**
    * 本地数据的筛选函数
    */
-  fn?: (filter: STColumnFilterMenu, record: any) => boolean;
+  fn?: (filter: STColumnFilterMenu, record: STData) => boolean;
   /**
    * 标识数据是否已过滤，筛选图标会高亮
    */
@@ -321,7 +329,7 @@ export interface STColumnFilter {
    * - 默认当 `multiple: true` 时以英文逗号拼接的字符串
    * @return 返回为 Object 对象
    */
-  reName?: (list: STColumnFilterMenu[], col: STColumn) => Object;
+  reName?: (list: STColumnFilterMenu[], col: STColumn) => {};
 }
 
 export interface STColumnFilterMenu {
@@ -404,7 +412,7 @@ export interface STColumnButton {
   /**
    * 格式化文本，较高调用频率，请勿过多复杂计算免得产生性能问题
    */
-  format?: (record: any, btn: STColumnButton) => string;
+  format?: (record: STData, btn: STColumnButton) => string;
   /**
    * 按钮类型
    * - `none` 无任何互动
@@ -423,9 +431,9 @@ export interface STColumnButton {
    * - load：重新加载数据，并重置页码为：`1`
    */
   click?:
-    | 'reload'
-    | 'load'
-    | ((record: any, modal?: any, instance?: STComponent) => any);
+  | 'reload'
+  | 'load'
+  | ((record: STData, modal?: any, instance?: STComponent) => any);
   /**
    * 是否需要气泡确认框
    */
@@ -454,11 +462,7 @@ export interface STColumnButton {
   /**
    * 条件表达式，较高调用频率，请勿过多复杂计算免得产生性能问题
    */
-  iif?: (
-    item: any,
-    btn: STColumnButton,
-    column: STColumn,
-  ) => boolean;
+  iif?: (item: STData, btn: STColumnButton, column: STColumn) => boolean;
 
   [key: string]: any;
 }
@@ -471,7 +475,7 @@ export interface STColumnButtonModal extends ModalHelperOptions {
   /**
    * 对话框参数
    */
-  params?: (record: any) => Object;
+  params?: (record: STData) => {};
   /**
    * 对话框目标组件的接收参数名，默认：`record`
    */
@@ -503,7 +507,7 @@ export interface STColumnButtonDrawer extends DrawerHelperOptions {
   /**
    * 抽屉参数
    */
-  params?: (record: any) => Object;
+  params?: (record: STData) => {};
   /**
    * 抽屉目标组件的接收参数名，默认：`record`
    */
@@ -562,6 +566,18 @@ export interface STExportOptions {
 }
 
 /**
+ * 单排序规则
+ * - 若不指定，则返回：`columnName=ascend|descend`
+ * - 若指定，则返回：`sort=columnName.(ascend|descend)`
+ */
+export interface STSingleSort {
+  /** 请求参数名，默认：`sort` */
+  key?: string;
+  /** 列名与状态间分隔符，默认：`.` */
+  nameSeparator?: string;
+}
+
+/**
  * 多排序相同排序 key 时合并规则
  */
 export interface STMultiSort {
@@ -571,6 +587,12 @@ export interface STMultiSort {
   separator?: string;
   /** 列名与状态间分隔符，默认：`.` */
   nameSeparator?: string;
+  /**
+   * 是否全局多排序模式，默认：`true`
+   * - `true` 表示所有 `st` 默认为多排序
+   * - `false` 表示需要为每个 `st` 添加 `multiSort` 才会视为多排序模式
+   */
+  global?: boolean;
 }
 
 /**
@@ -611,21 +633,29 @@ export interface STColumnTagValue {
    * - 色值：#f50,#ff0
    */
   color?:
-    | 'geekblue'
-    | 'blue'
-    | 'purple'
-    | 'success'
-    | 'red'
-    | 'volcano'
-    | 'orange'
-    | 'gold'
-    | 'lime'
-    | 'green'
-    | 'cyan'
-    | string;
+  | 'geekblue'
+  | 'blue'
+  | 'purple'
+  | 'success'
+  | 'red'
+  | 'volcano'
+  | 'orange'
+  | 'gold'
+  | 'lime'
+  | 'green'
+  | 'cyan'
+  | string;
 }
 
-export type STChangeType = 'pi' | 'ps' | 'checkbox' | 'radio' | 'sort' | 'filter' | 'click' | 'dblClick';
+export type STChangeType =
+  | 'pi'
+  | 'ps'
+  | 'checkbox'
+  | 'radio'
+  | 'sort'
+  | 'filter'
+  | 'click'
+  | 'dblClick';
 
 /**
  * 回调数据
@@ -687,3 +717,5 @@ export interface STError {
   type?: 'req';
   error?: any;
 }
+
+export type STRowClassName = (record: STData, index: number) => string;

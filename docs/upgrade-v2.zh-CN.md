@@ -10,7 +10,7 @@ ng-alain 2.0 变更主要从两个方面：
 - 使 CURD 操作更“自然”开发体验（[#588](https://github.com/ng-alain/ng-alain/issues/588)）
 - 更友好响应式开发
 
-原 `simpel-table`、`sf` 是受大家喜欢的组件之一，因此 ng-alain 2.0 重构并增加三个 Simple 系列组件：
+原 `simple-table`、`sf` 是受大家喜欢的组件之一，因此 ng-alain 2.0 重构并增加三个 Simple 系列组件：
 
 - [st](/components/table) 原 `simple-table`
   - 输入属性的变更，若你之前**通用配置优先**来使用的话，这些改变会少非常多
@@ -159,12 +159,12 @@ ng-alain 2.0 启用全新的 [ng-alain 组织](https://github.com/ng-alain/)，�
 | `[isPageIndexReset]`  | `page`     | `indexReset`      | √         | -        | -    |
 | `[toTopInChange]`     | `page`     | `toTop`           | √         | -        | -    |
 | `[toTopOffset]`       | `page`     | `toTopOffset`     | √         | -        | -    |
-| `(checkboxChange)`    | `(change)` | -                 | √         | -        | 过期提醒    |
-| `(radioChange)`       | `(change)` | -                 | √         | -        | 过期提醒    |
-| `(sortChange)`        | `(change)` | -                 | √         | -        | 过期提醒    |
-| `(filterChange)`      | `(change)` | -                 | √         | -        | 过期提醒    |
-| `(rowClick)`          | `(change)` | -                 | √         | -        | 过期提醒    |
-| `(rowDblClick)`       | `(change)` | -                 | √         | -        | 过期提醒    |
+| `(checkboxChange)`    | `(change)` | -                 | √         | ×        | 过期提醒    |
+| `(radioChange)`       | `(change)` | -                 | √         | ×        | 过期提醒    |
+| `(sortChange)`        | `(change)` | -                 | √         | ×        | 过期提醒    |
+| `(filterChange)`      | `(change)` | -                 | √         | ×        | 过期提醒    |
+| `(rowClick)`          | `(change)` | -                 | √         | ×        | 过期提醒    |
+| `(rowDblClick)`       | `(change)` | -                 | √         | ×        | 过期提醒    |
 
 > 一个示例说明 [#diff](https://github.com/ng-alain/ng-alain/pull/673/files#diff-f573fc0900f21b377dac432f1668c584L164)
 

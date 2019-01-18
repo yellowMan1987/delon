@@ -1,7 +1,8 @@
 import { Component, OnInit } from '@angular/core';
-import { ControlWidget } from '../../widget';
 import format from 'date-fns/format';
+import { SFValue } from '../../interface';
 import { toBool } from '../../utils';
+import { ControlWidget } from '../../widget';
 
 @Component({
   selector: 'sf-time',
@@ -30,11 +31,11 @@ import { toBool } from '../../utils';
 
   </sf-item-wrap>
   `,
-  preserveWhitespaces: false,
 })
 export class TimeWidget extends ControlWidget implements OnInit {
   displayValue: Date = null;
   format: string;
+  // tslint:disable-next-line:no-any
   i: any;
 
   ngOnInit(): void {
@@ -56,9 +57,15 @@ export class TimeWidget extends ControlWidget implements OnInit {
     };
   }
 
-  reset(value: any) {
+  private compCd() {
+    // TODO: removed after nz-datepick support OnPush mode
+    setTimeout(() => this.detectChanges());
+  }
+
+  reset(value: SFValue) {
     if (value instanceof Date) {
       this.displayValue = value;
+      this.compCd();
       return;
     }
     let v = value != null && value.toString().length ? new Date(value) : null;
@@ -69,6 +76,7 @@ export class TimeWidget extends ControlWidget implements OnInit {
       v = new Date(`1970-1-1 ` + value);
     }
     this.displayValue = v;
+    this.compCd();
   }
 
   _change(value: Date) {
@@ -77,16 +85,7 @@ export class TimeWidget extends ControlWidget implements OnInit {
       return;
     }
     if (this.ui.utcEpoch === true) {
-      this.setValue(
-        Date.UTC(
-          1970,
-          0,
-          1,
-          value.getHours(),
-          value.getMinutes(),
-          value.getSeconds(),
-        ),
-      );
+      this.setValue(Date.UTC(1970, 0, 1, value.getHours(), value.getMinutes(), value.getSeconds()));
       return;
     }
     this.setValue(format(value, this.format));

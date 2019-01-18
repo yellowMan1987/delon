@@ -5,7 +5,7 @@ export interface VDom {
   /** tag name */
   name?: string;
   /** tag attributes list */
-  attribs?: Object;
+  attribs?: {};
 
   parent?: VDom;
 
@@ -49,8 +49,8 @@ export interface ConvertRule {
   /** 条件式 */
   condition?: (dom: VDom) => boolean;
   extra_remove_attrs?: string[];
-  extra_insert_attrs?: Object;
-  extra_replace_attrs?: Object;
+  extra_insert_attrs?: {};
+  extra_replace_attrs?: {};
   /** {0} 表示属性值点位符 */
-  extra_update_attrs?: Object;
+  extra_update_attrs?: {};
 }

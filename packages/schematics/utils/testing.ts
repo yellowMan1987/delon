@@ -1,8 +1,8 @@
-import { join } from 'path';
 import {
   SchematicTestRunner,
   UnitTestTree,
 } from '@angular-devkit/schematics/testing';
+import { join } from 'path';
 import { Schema as NgAddSchema } from '../ng-add/schema.d';
 
 export const APPNAME = 'foo';
@@ -49,12 +49,10 @@ export function createAlainApp(
   const alainRunner = createAlainRunner();
   const tree = alainRunner.runSchematic(
     'ng-add',
-    Object.assign(
-      {
-        skipPackageJson: false,
-      },
-      ngAddOptions,
-    ),
+    {
+      skipPackageJson: false,
+      ...ngAddOptions,
+    },
     appTree,
   );
   return { runner: alainRunner, tree };

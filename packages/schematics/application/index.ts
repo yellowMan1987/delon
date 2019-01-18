@@ -1,36 +1,37 @@
-import {
-  Rule,
-  Tree,
-  SchematicContext,
-  chain,
-  noop,
-  mergeWith,
-  apply,
-  url,
-  template,
-  move,
-  filter,
-  MergeStrategy,
-} from '@angular-devkit/schematics';
 import { strings } from '@angular-devkit/core';
+import {
+  apply,
+  chain,
+  filter,
+  mergeWith,
+  move,
+  noop,
+  template,
+  url,
+  MergeStrategy,
+  Rule,
+  SchematicContext,
+  Tree,
+} from '@angular-devkit/schematics';
 import { NodePackageInstallTask } from '@angular-devkit/schematics/tasks';
 import * as path from 'path';
 
-import { Schema as ApplicationOptions } from './schema';
+import { getLangConfig, getLangData } from '../core/lang.config';
+import { tryAddFile } from '../utils/alain';
+import { HMR_CONTENT } from '../utils/contents';
+import { addFiles } from '../utils/file';
+import { addHeadStyle, addHtmlToBody } from '../utils/html';
 import {
   addPackageToPackageJson,
-  getPackage,
-  overwritePackage,
   getJSON,
+  getPackage,
   overwriteJSON,
+  overwritePackage,
   scriptsToAngularJson,
 } from '../utils/json';
 import { VERSION, ZORROVERSION } from '../utils/lib-versions';
-import { addFiles } from '../utils/file';
-import { Project, getProject } from '../utils/project';
-import { addHeadStyle, addHtmlToBody } from '../utils/html';
-import { tryAddFile } from '../utils/alain';
-import { HMR_CONTENT } from '../utils/contents';
+import { getProject, Project } from '../utils/project';
+import { Schema as ApplicationOptions } from './schema';
 
 const overwriteDataFileRoot = path.join(__dirname, 'overwrites');
 let project: Project;
@@ -55,23 +56,6 @@ function removeOrginalFiles() {
   };
 }
 
-function fixedNg6() {
-  return (host: Tree) => {
-    const pkg = getPackage(host);
-    // all @angular/*
-    ['dependencies', 'devDependencies'].forEach(type => {
-      Object.keys(pkg[type])
-        .filter(key => key.startsWith('@angular/'))
-        .forEach(key => {
-          pkg[type][key] = '^6.1.10';
-        });
-    });
-    pkg.devDependencies['@angular-devkit/build-angular'] = '~0.10.2';
-    pkg.devDependencies['typescript'] = '~2.9.2';
-    overwritePackage(host, pkg);
-  };
-}
-
 function fixMain() {
   return (host: Tree) => {
     // fix: main.ts using no hmr file
@@ -90,8 +74,8 @@ function addDependenciesToPackageJson(options: ApplicationOptions) {
       // allow ignore ng-zorro-antd becauce of @delon/theme dependency
       `ng-zorro-antd@${ZORROVERSION}`,
       // ng-zorro-antd need
-      'screenfull@^3.3.1',
-      'ajv@^6.4.0',
+      'screenfull@DEP-0.0.0-PLACEHOLDER',
+      'ajv@DEP-0.0.0-PLACEHOLDER',
     ]);
     // add ajv
     scriptsToAngularJson(host, ['node_modules/ajv/dist/ajv.bundle.js'], 'add', [
@@ -118,16 +102,17 @@ function addDependenciesToPackageJson(options: ApplicationOptions) {
       host,
       [
         `ng-alain@${VERSION}`,
+        `@delon/testing@${VERSION}`,
         // color-less
-        `less-bundle-promise@^1.0.7`,
+        `less-bundle-promise@DEP-0.0.0-PLACEHOLDER`,
       ],
       'devDependencies',
     );
     // i18n
     if (options.i18n) {
       addPackageToPackageJson(host, [
-        `@ngx-translate/core@^10.0.1`,
-        `@ngx-translate/http-loader@^3.0.1`,
+        `@ngx-translate/core@DEP-0.0.0-PLACEHOLDER`,
+        `@ngx-translate/http-loader@DEP-0.0.0-PLACEHOLDER`,
       ]);
     }
     return host;
@@ -138,9 +123,9 @@ function addRunScriptToPackageJson() {
   return (host: Tree, context: SchematicContext) => {
     const json = getPackage(host, 'scripts');
     if (json == null) return host;
-    json.scripts['start'] = `npm run color-less && ng serve -o`;
-    json.scripts['build'] = `npm run color-less && ng build --prod --build-optimizer`;
-    json.scripts['analyze'] = `npm run color-less && ng build --prod --build-optimizer --stats-json`;
+    json.scripts.start = `npm run color-less && ng serve -o`;
+    json.scripts.build = `npm run color-less && ng build --prod --build-optimizer`;
+    json.scripts.analyze = `npm run color-less && ng build --prod --build-optimizer --stats-json`;
     json.scripts['test-coverage'] = `ng test --code-coverage --watch=false`;
     json.scripts['color-less'] = `node scripts/color-less.js`;
     overwritePackage(host, json);
@@ -170,13 +155,10 @@ function addPathsToTsConfig() {
       if (!json.compilerOptions.paths) json.compilerOptions.paths = {};
       json.compilerOptions.baseUrl = item.baseUrl;
       const paths = json.compilerOptions.paths;
-      paths['@shared'] = ['app/shared'];
+      paths['@shared'] = ['app/shared/index'];
       paths['@shared/*'] = ['app/shared/*'];
-      paths['@core'] = ['app/core'];
+      paths['@core'] = ['app/core/index'];
       paths['@core/*'] = ['app/core/*'];
-      paths['@testing'] = ['testing'];
-      paths['@testing/*'] = ['testing/*'];
-      paths['@env'] = ['environments'];
       paths['@env/*'] = ['environments/*'];
       overwriteJSON(host, item.path, json);
     });
@@ -188,7 +170,7 @@ function addCodeStylesToPackageJson() {
   return (host: Tree, context: SchematicContext) => {
     const json = getPackage(host);
     if (json == null) return host;
-    json.scripts['lint'] = `npm run lint:ts && npm run lint:style`;
+    json.scripts.lint = `npm run lint:ts && npm run lint:style`;
     json.scripts[
       'lint:ts'
     ] = `tslint -p src/tsconfig.app.json -c tslint.json 'src/**/*.ts'`;
@@ -202,12 +184,12 @@ function addCodeStylesToPackageJson() {
       ],
       '*.ts': ['npm run lint:ts', 'prettier --write', 'git add'],
       '*.less': ['npm run lint:style', 'prettier --write', 'git add'],
-      ignore: ['src/assets/*'],
+      'ignore': ['src/assets/*'],
     };
     overwritePackage(host, json);
     // tslint
     const tsLint = getJSON(host, 'tslint.json', 'rules');
-    tsLint.rules['curly'] = false;
+    tsLint.rules.curly = false;
     tsLint.rules['use-host-property-decorator'] = false;
     tsLint.rules['directive-selector'] = [
       true,
@@ -242,15 +224,15 @@ function addCodeStylesToPackageJson() {
     }
     // dependencies
     addPackageToPackageJson(host, [
-      `tslint-config-prettier@^1.12.0`,
-      `tslint-language-service@^0.9.9`,
-      `editorconfig-tools@^0.1.1`,
-      `lint-staged@^7.1.2`,
-      `husky@^0.14.3`,
-      `prettier@^1.12.1`,
-      `prettier-stylelint@^0.4.2`,
-      `stylelint@^9.2.0`,
-      `stylelint-config-standard@^18.2.0`,
+      `tslint-config-prettier@DEP-0.0.0-PLACEHOLDER`,
+      `tslint-language-service@DEP-0.0.0-PLACEHOLDER`,
+      `editorconfig-tools@DEP-0.0.0-PLACEHOLDER`,
+      `lint-staged@DEP-0.0.0-PLACEHOLDER`,
+      `husky@DEP-0.0.0-PLACEHOLDER`,
+      `prettier@DEP-0.0.0-PLACEHOLDER`,
+      `prettier-stylelint@DEP-0.0.0-PLACEHOLDER`,
+      `stylelint@DEP-0.0.0-PLACEHOLDER`,
+      `stylelint-config-standard@DEP-0.0.0-PLACEHOLDER`,
     ]);
     return host;
   };
@@ -377,7 +359,7 @@ export class <%= componentName %> implements OnInit {
 
 }
 `,
-  '__name@dasherize__.component.spec.ts': `import { async, ComponentFixture, TestBed } from '@angular/core/testing';
+    '__name@dasherize__.component.spec.ts': `import { async, ComponentFixture, TestBed } from '@angular/core/testing';
   import { <%= componentName %> } from './<%= dasherize(name) %>.component';
 
   describe('<%= componentName %>', () => {
@@ -401,7 +383,7 @@ export class <%= componentName %> implements OnInit {
       expect(component).toBeTruthy();
     });
   });
-  `
+  `,
   };
   return (host: Tree) => {
     const prefix = `${project.root}/_cli-tpl/test/__path__/__name@dasherize@if-flat__/`;
@@ -450,13 +432,70 @@ function addFilesToRoot(options: ApplicationOptions) {
   ]);
 }
 
+function fixLang(options: ApplicationOptions) {
+  return (host: Tree) => {
+    if (options.i18n) return;
+    const langs = getLangData(options.defaultLanguage);
+    if (!langs) return;
+
+    console.log(`Translating, please wait...`);
+
+    host.visit(p => {
+      if (~p.indexOf(`/node_modules/`)) return;
+
+      fixLangInHtml(host, p, langs);
+    });
+  };
+}
+
+function fixLangInHtml(host: Tree, p: string, langs: {}) {
+  let html = host.get(p).content.toString('utf8');
+  let matchCount = 0;
+  // {{(status ? 'menu.fullscreen.exit' : 'menu.fullscreen') | translate }}
+  html = html.replace(/\{\{\(status \? '([^']+)' : '([^']+)'\) \| translate \}\}/g, (word, key1, key2) => {
+    ++matchCount;
+    return `{{ status ? '${langs[key1] || key1}' : '${langs[key2] || key2}' }}`;
+  });
+  // {{ 'app.register-result.msg' | translate:params }}
+  html = html.replace(/\{\{[ ]?'([^']+)'[ ]? \| translate:[^ ]+ \}\}/g, (word, key) => {
+    ++matchCount;
+    return langs[key] || key;
+  });
+  // {{ 'Please enter mobile number!' | translate }}
+  html = html.replace(/\{\{[ ]?'([^']+)' \| translate[ ]?\}\}/g, (word, key) => {
+    ++matchCount;
+    return langs[key] || key;
+  });
+  // [nzTitle]="'app.login.tab-login-credentials' | translate"
+  html = html.replace(/'([^']+)' \| translate[ ]?/g, (word, key) => {
+    ++matchCount;
+    const value = langs[key] || key;
+    return `'${value}'`;
+  });
+  // 'app.register.get-verification-code' | translate
+  html = html.replace(/'([^']+)' \| translate/g, (word, key) => {
+    ++matchCount;
+    return langs[key] || key;
+  });
+  // removed `header-i18n`
+  if (~html.indexOf(`<header-i18n [showLang]="false" class="langs"></header-i18n>`)) {
+    ++matchCount;
+    html = html.replace(`<header-i18n [showLang]="false" class="langs"></header-i18n>`, ``);
+  }
+  if (matchCount > 0) {
+    host.overwrite(p, html);
+  }
+}
+
 function installPackages() {
   return (host: Tree, context: SchematicContext) => {
+    console.log(`Start installing dependencies, please wait...`);
+
     context.addTask(new NodePackageInstallTask());
   };
 }
 
-export default function(options: ApplicationOptions): Rule {
+export default function (options: ApplicationOptions): Rule {
   return (host: Tree, context: SchematicContext) => {
     project = getProject(host, options.project);
 
@@ -474,9 +513,9 @@ export default function(options: ApplicationOptions): Rule {
       addFilesToRoot(options),
       addCliTpl(options),
       fixMain(),
-      fixedNg6(),
       forceLess(),
       addStyle(options),
+      fixLang(options),
       installPackages(),
     ])(host, context);
   };

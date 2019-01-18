@@ -1,6 +1,8 @@
 import { Component } from '@angular/core';
-import { ControlWidget } from '../../widget';
+import { SFValue } from '../../interface';
+import { SFSchemaEnum } from '../../schema/index';
 import { getData } from '../../utils';
+import { ControlWidget } from '../../widget';
 
 @Component({
   selector: 'sf-radio',
@@ -12,7 +14,7 @@ import { getData } from '../../utils';
       [nzSize]="ui.size"
       [nzName]="id"
       [ngModel]="value"
-      (ngModelChange)="setValue($event)">
+      (ngModelChange)="_setValue($event)">
       <ng-container *ngIf="styleType">
         <label *ngFor="let option of data"
           nz-radio
@@ -33,16 +35,20 @@ import { getData } from '../../utils';
 
   </sf-item-wrap>
   `,
-  preserveWhitespaces: false,
 })
 export class RadioWidget extends ControlWidget {
-  data: any[] = [];
+  data: SFSchemaEnum[] = [];
   styleType: boolean;
 
-  reset(value: any) {
+  reset(value: SFValue) {
     this.styleType = (this.ui.styleType || 'default') === 'default';
     getData(this.schema, this.ui, this.formProperty.formData).subscribe(
       list => (this.data = list),
     );
+  }
+
+  _setValue(value: SFValue) {
+    this.setValue(value);
+    if (this.ui.change) this.ui.change(value);
   }
 }

@@ -6,7 +6,7 @@ release:
   stage: compile
   job_type: lite_image_build
   only:
-    branches:
+    tags:
     - .*
   allow_failure: false
   compile:
@@ -24,7 +24,7 @@ self:
   stage: deploy
   job_type: DCS_deploy
   only:
-    branches:
+    tags:
     - .*
   allow_failure: false
   dependencies:

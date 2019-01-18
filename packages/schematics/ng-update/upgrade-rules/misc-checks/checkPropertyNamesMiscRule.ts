@@ -1,13 +1,13 @@
 import chalk from 'chalk';
-import { RuleFailure, Rules } from 'tslint';
+import { Rules, RuleFailure } from 'tslint';
 import * as ts from 'typescript';
-import { ExternalResource } from '../../tslint/component-file';
-import { ComponentWalker } from '../../tslint/component-walker';
 import {
   findElements,
-  findElementHasAttributes,
   findElementHasAttribute,
+  findElementHasAttributes,
 } from '../../html-parsing/elements';
+import { ExternalResource } from '../../tslint/component-file';
+import { ComponentWalker } from '../../tslint/component-walker';
 
 export class Rule extends Rules.AbstractRule {
   apply(sourceFile: ts.SourceFile): RuleFailure[] {
@@ -34,7 +34,7 @@ export class Walker extends ComponentWalker {
   }
 
   private _createFailuresForContent(node: ts.Node, content: string) {
-    const failures: { message: string; start: number; end: number }[] = [];
+    const failures: Array<{ message: string; start: number; end: number }> = [];
 
     findElementHasAttributes(content, 'st', [
       '(checkboxChange)',
@@ -48,7 +48,7 @@ export class Walker extends ComponentWalker {
         start: node.getStart() + list.offset,
         end: node.getStart() + list.offset + list.attr.length,
         message:
-          `Found deprecated @Output() "${chalk.red(list.attr)}" on "${chalk.bold(
+          `Found removed @Output() "${chalk.red(list.attr)}" on "${chalk.bold(
             'st(simple-table)',
           )}". ` +
           `Use "${chalk.green(

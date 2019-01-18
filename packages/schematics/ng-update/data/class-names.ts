@@ -1,5 +1,5 @@
-import {TargetVersion} from '../target-version';
-import {VersionChanges} from '../upgrade-data';
+import { TargetVersion } from '../target-version';
+import { VersionChanges } from '../upgrade-data';
 
 export interface ClassNameUpgradeData {
   /** The Class name to replace. */
@@ -15,29 +15,29 @@ export const classNames: VersionChanges<ClassNameUpgradeData> = {
       changes: [
         {
           replace: 'SimpleTableColumn',
-          replaceWith: 'STColumn'
+          replaceWith: 'STColumn',
         },
         {
           replace: 'SimpleTableComponent',
-          replaceWith: 'STComponent'
+          replaceWith: 'STComponent',
         },
         {
           replace: 'SimpleTableData',
-          replaceWith: 'STData'
+          replaceWith: 'STData',
         },
         {
           replace: 'SimpleTableButton',
-          replaceWith: 'STColumnButton'
+          replaceWith: 'STColumnButton',
         },
         {
           replace: 'SimpleTableChange',
-          replaceWith: 'STChange'
+          replaceWith: 'STChange',
         },
         {
           replace: 'AdPageHeaderConfig',
-          replaceWith: 'PageHeaderConfig'
+          replaceWith: 'PageHeaderConfig',
         },
-      ]
+      ],
     },
-  ]
+  ],
 };

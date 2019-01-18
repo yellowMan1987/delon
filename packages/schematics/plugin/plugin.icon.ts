@@ -1,35 +1,43 @@
-import { Tree, SchematicContext, Rule } from '@angular-devkit/schematics';
 import { strings } from '@angular-devkit/core';
-import * as ts from 'typescript';
+import { Rule, SchematicContext, Tree } from '@angular-devkit/schematics';
+import { findNodes } from '@schematics/angular/utility/ast-utils';
 import {
-  DefaultTreeDocument,
-  DefaultTreeElement,
   parseFragment,
   Attribute,
+  DefaultTreeDocument,
+  DefaultTreeElement,
 } from 'parse5';
+import * as ts from 'typescript';
 
+import { getSourceFile, updateComponentMetadata } from '../utils/ast';
 import { PluginOptions } from './interface';
-import { updateComponentMetadata, getSourceFile } from '../utils/ast';
-import { findNodes } from '../utils/devkit-utils/ast-utils';
 
 // includes ng-zorro-antd & @delon/*
 // - zorro: https://github.com/NG-ZORRO/ng-zorro-antd/blob/master/components/icon/nz-icon.service.ts#L6
 // - @delon: https://github.com/ng-alain/delon/blob/master/packages/theme/src/theme.module.ts#L33
 const WHITE_ICONS = [
   // zorro
+  'BarsOutline',
   'CalendarOutline',
+  'CaretDownFill',
+  'CaretDownOutline',
   'CheckCircleFill',
   'CheckCircleOutline',
   'CheckOutline',
   'ClockCircleOutline',
-  'CloseCircleOutline',
   'CloseCircleFill',
+  'CloseCircleOutline',
   'CloseOutline',
   'DoubleLeftOutline',
   'DoubleRightOutline',
   'DownOutline',
+  'EllipsisOutline',
   'ExclamationCircleFill',
   'ExclamationCircleOutline',
+  'EyeOutline',
+  'FileFill',
+  'FileOutline',
+  'FilterFill',
   'InfoCircleFill',
   'InfoCircleOutline',
   'LeftOutline',
@@ -37,6 +45,7 @@ const WHITE_ICONS = [
   'PaperClipOutline',
   'QuestionCircleOutline',
   'RightOutline',
+  'SearchOutline',
   'UploadOutline',
   'UpOutline',
   // delon
@@ -260,7 +269,7 @@ export const ICONS = [ ];
     return;
   }
   const source = getSourceFile(host, path);
-  const allImports = findNodes(source, ts.SyntaxKind.ImportDeclaration);
+  const allImports = findNodes(source as any, ts.SyntaxKind.ImportDeclaration);
   const iconImport = allImports.find((w: ts.ImportDeclaration) =>
     w.moduleSpecifier.getText().includes('@ant-design/icons-angular/icons'),
   ) as ts.ImportDeclaration;
@@ -294,8 +303,11 @@ export const ICONS_AUTO = [
 
 export function pluginIcon(options: PluginOptions): Rule {
   return (host: Tree, context: SchematicContext) => {
+    console.log(`Analyzing files...`);
     genCustomIcons(options, host);
     const icons = getIcons(host);
     genIconFile(options, host, icons);
+    console.log(`\n生成成功，如果是首次运行，需要手动引用，参考：https://ng-alain.com/theme/icon/zh`);
+    console.log(`\nFinished, if it's first run, you need manually reference it, refer to: https://ng-alain.com/theme/icon/en`);
   };
 }

@@ -1,21 +1,10 @@
 // alain
-@import '../packages/theme/styles/index';
-@import '../packages/theme/styles/layout/default/index';
-@import '../packages/abc/index';
-@import '../packages/chart/index';
+@import '../packages/theme/styles/index.less';
+@import '../packages/theme/styles/layout/default/index.less';
+@import '../packages/abc/index.less';
+@import '../packages/chart/index.less';
 
 // docs
 @import './app/styles/index.less';
 
-.ng-alain-next {
-  #header {
-    background: linear-gradient(145deg,#dd0031,#c3002f);
-    .ant-select-selection__placeholder,
-    .ant-menu,
-    .ant-select-selection,
-    .ant-select-selection__clear {
-      color: #fff;
-      background: transparent;
-    }
-  }
-}
+.scrollbar-mixin(~'.ant-affix');

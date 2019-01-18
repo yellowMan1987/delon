@@ -1,16 +1,16 @@
-import { Injectable, Optional, Inject, Host } from '@angular/core';
+import { Host, Inject, Injectable, Optional } from '@angular/core';
 import { ACLService } from '@delon/acl';
-import { ALAIN_I18N_TOKEN, AlainI18NService } from '@delon/theme';
+import { AlainI18NService, ALAIN_I18N_TOKEN } from '@delon/theme';
 import { deepCopy } from '@delon/util';
 
+import { STRowSource } from './table-row.directive';
+import { STConfig } from './table.config';
 import {
   STColumn,
   STColumnButton,
-  STColumnSort,
   STColumnFilter,
+  STColumnSort,
 } from './table.interfaces';
-import { STRowSource } from './table-row.directive';
-import { STConfig } from './table.config';
 
 export interface STSortMap extends STColumnSort {
   /** 是否启用排序 */
@@ -22,11 +22,9 @@ export class STColumnSource {
   constructor(
     @Host() private rowSource: STRowSource,
     @Optional() private acl: ACLService,
-    @Optional()
-    @Inject(ALAIN_I18N_TOKEN)
-    private i18nSrv: AlainI18NService,
+    @Optional() @Inject(ALAIN_I18N_TOKEN) private i18nSrv: AlainI18NService,
     private cog: STConfig,
-  ) {}
+  ) { }
 
   private btnCoerce(list: STColumnButton[]): STColumnButton[] {
     if (!list) return [];
@@ -53,7 +51,7 @@ export class STColumnSource {
           console.warn(`[st] Should specify modal parameter`);
           item.type = 'none';
         } else {
-          item.modal = Object.assign({}, modal, item.modal);
+          item.modal = { ...{ paramsName: 'record', size: 'lg' }, ...modal, ...item.modal };
         }
       }
 
@@ -62,7 +60,7 @@ export class STColumnSource {
           console.warn(`[st] Should specify drawer parameter`);
           item.type = 'none';
         } else {
-          item.drawer = Object.assign({}, drawer, item.drawer);
+          item.drawer = { ...{ paramsName: 'record', size: 'lg' }, ...drawer, ...item.drawer };
         }
       }
 
@@ -71,26 +69,19 @@ export class STColumnSource {
       }
 
       if (item.pop === true) {
-        item._type = 'pop';
-        if (typeof item.popTitle === 'undefined') {
-          item.popTitle = popTitle;
-        }
+        item.popTitle = item.popTitle || popTitle;
+      } else {
+        item.pop = false;
       }
+
       if (item.icon) {
-        item._type = 'icon';
-        item.icon = Object.assign(
-          {},
-          btnIcon,
-          typeof item.icon === 'string' ? { type: item.icon } : item.icon,
-        );
+        item.icon = {
+          ...btnIcon,
+          ...(typeof item.icon === 'string' ? { type: item.icon } : item.icon),
+        };
       }
-      if (item.children && item.children.length > 0) {
-        item._type = 'sub';
-        item.children = this.btnCoerce(item.children);
-      }
-      if (!item._type) {
-        item._type = '';
-      }
+
+      item.children = item.children && item.children.length > 0 ? this.btnCoerce(item.children) : [];
 
       // i18n
       if (item.i18n && this.i18nSrv) {
@@ -120,19 +111,12 @@ export class STColumnSource {
     // left width
     list
       .filter(w => w.fixed && w.fixed === 'left' && w.width)
-      .forEach(
-        (item, idx) =>
-          (item._left = list.slice(0, idx).reduce(countReduce, 0) + 'px'),
-      );
+      .forEach((item, idx) => (item._left = list.slice(0, idx).reduce(countReduce, 0) + 'px'));
     // right width
     list
       .filter(w => w.fixed && w.fixed === 'right' && w.width)
       .reverse()
-      .forEach(
-        (item, idx) =>
-          (item._right =
-            (idx > 0 ? list.slice(-idx).reduce(countReduce, 0) : 0) + 'px'),
-      );
+      .forEach((item, idx) => (item._right = (idx > 0 ? list.slice(-idx).reduce(countReduce, 0) : 0) + 'px'));
   }
 
   private sortCoerce(item: STColumn): STSortMap {
@@ -140,6 +124,7 @@ export class STColumnSource {
     if (item.sorter && typeof item.sorter === 'function') {
       return {
         enabled: true,
+        // tslint:disable-next-line:no-any
         default: item.sort as any,
         compare: item.sorter,
         key: item.sortKey || item.indexKey,
@@ -176,6 +161,7 @@ export class STColumnSource {
         confirmText: item.filterConfirmText,
         clearText: item.filterClearText,
         default: item.filtered,
+        // tslint:disable-next-line:no-any
         fn: item.filter as any,
         icon: item.filterIcon,
         key: item.filterKey || item.indexKey,
@@ -233,8 +219,10 @@ export class STColumnSource {
     if (!list || list.length === 0)
       throw new Error(`[st]: the columns property muse be define!`);
 
+    const { noIndex } = this.cog;
     let checkboxCount = 0;
     let radioCount = 0;
+    let point = 0;
     const columns: STColumn[] = [];
     const copyColumens = deepCopy(list) as STColumn[];
     for (const item of copyColumens) {
@@ -251,6 +239,10 @@ export class STColumnSource {
       // title
       if (item.i18n && this.i18nSrv) {
         item.title = this.i18nSrv.fanyi(item.i18n);
+      }
+      // no
+      if (item.type === 'no') {
+        item.noIndex = item.noIndex == null ? noIndex : item.noIndex;
       }
       // checkbox
       if (item.selections == null) {
@@ -275,7 +267,7 @@ export class STColumnSource {
       }
       // types
       if (item.type === 'yn') {
-        item.yn = Object.assign({ truth: true }, item.yn);
+        item.yn = { truth: true, ...item.yn };
         // compatible
         if (item.ynTruth != null) item.yn.truth = item.ynTruth;
         if (item.ynYes != null) item.yn.yes = item.ynYes;
@@ -286,6 +278,7 @@ export class STColumnSource {
         (item.type === 'badge' && item.badge == null) ||
         (item.type === 'tag' && item.tag == null)
       ) {
+        // tslint:disable-next-line:no-any
         (item as any).type = '';
       }
       // className
@@ -306,6 +299,7 @@ export class STColumnSource {
       // restore custom row
       this.restoreRender(item);
 
+      item.__point = point++;
       columns.push(item);
     }
     if (checkboxCount > 1) {

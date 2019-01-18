@@ -1,31 +1,18 @@
-import {
-  Injector,
-  NgModuleFactoryLoader,
-  Component,
-  NgModule,
-} from '@angular/core';
+import { HttpClient, HttpEvent, HttpHandler, HttpHeaders, HttpInterceptor, HttpRequest, HttpResponse, HTTP_INTERCEPTORS } from '@angular/common/http';
+import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
+import { Component, NgModule, NgModuleFactoryLoader } from '@angular/core';
+import { fakeAsync, inject, tick, TestBed, TestBedStatic } from '@angular/core/testing';
 import { Router, RouterModule } from '@angular/router';
-import { TestBed, fakeAsync, inject, tick } from '@angular/core/testing';
-import {
-  HttpTestingController,
-  HttpClientTestingModule,
-} from '@angular/common/http/testing';
-import {
-  HTTP_INTERCEPTORS,
-  HttpClient,
-  HttpResponse,
-} from '@angular/common/http';
-import {
-  RouterTestingModule,
-  SpyNgModuleFactoryLoader,
-} from '@angular/router/testing';
+import { RouterTestingModule, SpyNgModuleFactoryLoader } from '@angular/router/testing';
+
 import * as Mock from 'mockjs';
+import { Observable } from 'rxjs';
+import { mapTo } from 'rxjs/operators';
+import { MockRequest } from './interface';
+import { DelonMockConfig } from './mock.config';
+import { DelonMockModule } from './mock.module';
 import { MockService } from './mock.service';
 import { MockStatusError } from './status.error';
-import { DelonMockConfig } from './mock.config';
-import { MockInterceptor } from './mock.interceptor';
-import { MockRequest } from './interface';
-import { DelonMockModule } from './mock.module';
 
 const DATA = {
   USERS: {
@@ -35,6 +22,7 @@ const DATA = {
     '/array': [1, 2],
     '/fn/queryString': (req: MockRequest) => req.queryString,
     '/fn/header': (req: MockRequest) => req.headers,
+    '/HttpResponse': () => new HttpResponse({ body: 'Body', headers: new HttpHeaders({ 'token': '1' }) }),
     'POST /fn/body': (req: MockRequest) => req.body,
     'POST /users/1': { uid: 1, action: 'add' },
     '/404': () => {
@@ -46,13 +34,20 @@ const DATA = {
   },
 };
 
+let otherRes = new HttpResponse();
+class OtherInterceptor implements HttpInterceptor {
+  intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
+    return next.handle(req.clone()).pipe(mapTo(otherRes));
+  }
+}
+
 describe('mock: interceptor', () => {
-  let injector: Injector;
+  let injector: TestBedStatic;
   let srv: MockService = null;
   let http: HttpClient;
   let httpMock: HttpTestingController;
 
-  function genModule(options: DelonMockConfig) {
+  function genModule(options: DelonMockConfig, imports: any[] = [], spyConsole = true, providers?: any[]) {
     options = Object.assign(new DelonMockConfig(), options);
     injector = TestBed.configureTestingModule({
       declarations: [RootCmp],
@@ -65,21 +60,20 @@ describe('mock: interceptor', () => {
           },
         ]),
         DelonMockModule.forRoot(options),
-      ],
-      providers: [
-        { provide: HTTP_INTERCEPTORS, useClass: MockInterceptor, multi: true },
-      ],
+      ].concat(imports),
+      providers: [].concat(providers || []),
     });
     srv = injector.get(MockService);
     http = injector.get(HttpClient);
     httpMock = injector.get(HttpTestingController);
-    spyOn(console, 'log');
-    spyOn(console, 'warn');
-    spyOn(console, 'error');
+    if (spyConsole) {
+      spyOn(console, 'log');
+      spyOn(console, 'warn');
+    }
   }
 
   describe('[default]', () => {
-    beforeEach(() => genModule({ data: DATA, delay: 1 }));
+    beforeEach(() => genModule({ executeOtherInterceptors: false, data: DATA, delay: 1 }));
     it('should be init', (done: () => void) => {
       http.get('/users').subscribe((res: any) => {
         expect(res).not.toBeNull();
@@ -134,6 +128,15 @@ describe('mock: interceptor', () => {
         done();
       });
     });
+    it('should return HttpResponse', (done: () => void) => {
+      const key = '/HttpResponse';
+      http.get(key, { observe: 'response' }).subscribe((res: HttpResponse<any>) => {
+        expect(res).not.toBeNull();
+        expect(res.body).toBe('Body');
+        expect(res.headers.get('token')).toBe('1');
+        done();
+      });
+    });
     it('should response HttpStatus: 404', (done: () => void) => {
       http.get('/404').subscribe(
         () => {
@@ -153,7 +156,6 @@ describe('mock: interceptor', () => {
           done();
         },
         () => {
-          expect(console.error).toHaveBeenCalled();
           expect(true).toBe(true);
           done();
         },
@@ -220,7 +222,7 @@ describe('mock: interceptor', () => {
             selector: 'lazy',
             template: '<router-outlet></router-outlet>',
           })
-          class LayoutComponent {}
+          class LayoutComponent { }
 
           @Component({
             selector: 'child',
@@ -242,7 +244,7 @@ describe('mock: interceptor', () => {
               ]),
             ],
           })
-          class LazyModule {}
+          class LazyModule { }
 
           loader.stubbedModules = { expected: LazyModule };
           const fixture = TestBed.createComponent(RootCmp);
@@ -256,10 +258,27 @@ describe('mock: interceptor', () => {
       ),
     ));
   });
+  describe('[executeOtherInterceptors]', () => {
+    beforeEach(() => {
+      genModule(
+        { data: DATA, delay: 1, executeOtherInterceptors: true }, [], true, [
+        { provide: HTTP_INTERCEPTORS, useClass: OtherInterceptor, multi: true },
+      ]);
+    });
+
+    it('shoul working', (done) => {
+      otherRes = new HttpResponse({ body: { a: 1 } });
+      http.get('/users').subscribe((res: any) => {
+        expect(res).not.toBeNull();
+        expect(res.a).toBe(1);
+        done();
+      });
+    });
+  });
 });
 
 @Component({
   selector: 'root-cmp',
   template: `<router-outlet></router-outlet>`,
 })
-class RootCmp {}
+class RootCmp { }

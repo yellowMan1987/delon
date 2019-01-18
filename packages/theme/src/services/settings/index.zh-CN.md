@@ -1,6 +1,7 @@
 ---
 order: 1
-title: 项目配置项服务
+title: SettingsService
+subtitle: 项目配置项服务
 type: Service
 ---
 
@@ -9,6 +10,8 @@ type: Service
 **建议：** 在 Angular 启动服务（[startup.service.ts](https://github.com/ng-alain/ng-alain/blob/master/src/app/core/startup/startup.service.ts)）从远程获取到应用、用户数据后，调用 `setApp()`、`setUser()` 方法。
 
 ## API
+
+### SettingsService
 
 | 名称                                  | 类型       | 返回值                       | 描述           |
 | ------------------------------------- | ---------- | ---------------------------- | -------------- |
@@ -19,3 +22,26 @@ type: Service
 | `setLayout(name: string, value: any)` | `method`   | `boolean`                    | 设置布局属性值 |
 | `setApp(value: App)`                  | `method`   | `boolean`                    | 设置项目信息   |
 | `setUser(value: User)`                | `method`   | `boolean`                    | 设置用户信息   |
+
+### App
+
+| 参数            | 说明     | 类型     | 默认值 |
+|-----------------|--------|----------|--------|
+| `[name]`        | 应用名称 | `string` | -      |
+| `[description]` | 应用描述 | `string` | -      |
+
+### User
+
+| 参数       | 说明         | 类型     | 默认值 |
+|------------|------------|----------|--------|
+| `[name]`   | 当前用户名称 | `string` | -      |
+| `[avatar]` | 当前用户头像 | `string` | -      |
+| `[email]`  | 当前用户邮箱 | `string` | -      |
+
+### Layout
+
+| 参数          | 说明         | 类型      | 默认值  |
+|---------------|------------|-----------|---------|
+| `[collapsed]` | 是否折叠菜单 | `boolean` | -       |
+| `[lang]`      | 当前语言     | `string`  | -       |
+| `[colorWeak]` | 色弱模式     | `boolean` | `false` |
