@@ -25,8 +25,8 @@ import {
   DatePipe,
   DelonLocaleService,
   DrawerHelper,
+  LocaleData,
   ModalHelper,
-  ModalHelperOptions,
   YNPipe,
 } from '@delon/theme';
 import {
@@ -62,6 +62,8 @@ import {
   STRes,
   STRowClassName,
   STSingleSort,
+  STStatisticalResults,
+  STWidthMode,
 } from './table.interfaces';
 
 @Component({
@@ -82,10 +84,11 @@ import {
 export class STComponent implements AfterViewInit, OnChanges, OnDestroy {
   private unsubscribe$ = new Subject<void>();
   private totalTpl = ``;
-  // tslint:disable-next-line:no-any
-  private locale: any = {};
+  private locale: LocaleData = {};
   private clonePage: STPage;
+  private copyCog: STConfig;
   _data: STData[] = [];
+  _statistical: STStatisticalResults = {};
   _isPagination = true;
   _allChecked = false;
   _allCheckedDisabled = false;
@@ -101,7 +104,7 @@ export class STComponent implements AfterViewInit, OnChanges, OnDestroy {
     return this._req;
   }
   set req(value: STReq) {
-    this._req = deepMerge({}, this.cog.req, value);
+    this._req = deepMerge({}, this._req, this.cog.req, value);
   }
   private _req: STReq;
   /** 返回体配置 */
@@ -162,7 +165,6 @@ export class STComponent implements AfterViewInit, OnChanges, OnDestroy {
   get multiSort() {
     return this._multiSort;
   }
-  // tslint:disable-next-line:no-any
   set multiSort(value: any) {
     if (typeof value === 'boolean' && !toBoolean(value)) {
       this._multiSort = null;
@@ -173,12 +175,22 @@ export class STComponent implements AfterViewInit, OnChanges, OnDestroy {
     };
   }
   @Input() rowClassName: STRowClassName;
+  @Input()
+  set widthMode(value: STWidthMode) {
+    this._widthMode = { type: 'default', strictBehavior: 'truncate', ...value };
+  }
+  get widthMode() {
+    return this._widthMode;
+  }
+  private _widthMode: STWidthMode;
   /** `header` 标题 */
   @Input() header: string | TemplateRef<void>;
   /** `footer` 底部 */
   @Input() footer: string | TemplateRef<void>;
+  /** 额外 `body` 顶部内容 */
+  @Input() bodyHeader: TemplateRef<STStatisticalResults>;
   /** 额外 `body` 内容 */
-  @Input() body: TemplateRef<void>;
+  @Input() body: TemplateRef<STStatisticalResults>;
   @Input() @InputBoolean() expandRowByClick = false;
   /** `expand` 可展开，当数据源中包括 `expand` 表示展开状态 */
   @Input() expand: TemplateRef<{ $implicit: {}; column: STColumn }>;
@@ -206,7 +218,6 @@ export class STComponent implements AfterViewInit, OnChanges, OnDestroy {
     private exportSrv: STExport,
     private modalHelper: ModalHelper,
     private drawerHelper: DrawerHelper,
-    // tslint:disable-next-line:no-any
     @Inject(DOCUMENT) private doc: any,
     private columnSource: STColumnSource,
     private dataSource: STDataSource,
@@ -220,9 +231,9 @@ export class STComponent implements AfterViewInit, OnChanges, OnDestroy {
       }
     });
 
-    const copyCog = deepMergeKey(new STConfig(), true, cog);
-    delete copyCog.multiSort;
-    Object.assign(this, copyCog);
+    this.copyCog = deepMergeKey(new STConfig(), true, cog);
+    delete this.copyCog.multiSort;
+    Object.assign(this, this.copyCog);
     if (cog.multiSort && cog.multiSort.global !== false) {
       this.multiSort = { ...cog.multiSort };
     }
@@ -249,7 +260,14 @@ export class STComponent implements AfterViewInit, OnChanges, OnDestroy {
       : '';
   }
 
-  // tslint:disable-next-line:no-any
+  isTruncate(column: STColumn): boolean {
+    return column.width && this.widthMode.strictBehavior === 'truncate';
+  }
+
+  columnClass(column: STColumn): string {
+    return column.className || (this.isTruncate(column) ? 'text-truncate' : null);
+  }
+
   private changeEmit(type: STChangeType, data?: any) {
     const res: STChange = {
       type,
@@ -268,21 +286,10 @@ export class STComponent implements AfterViewInit, OnChanges, OnDestroy {
     return { pi, ps, total };
   }
 
-  //#region data
+  // #region data
 
   private _load() {
-    const {
-      pi,
-      ps,
-      data,
-      req,
-      res,
-      page,
-      total,
-      singleSort,
-      multiSort,
-      rowClassName,
-    } = this;
+    const { pi, ps, data, req, res, page, total, singleSort, multiSort, rowClassName } = this;
     this.loading = true;
     return this.dataSource
       .process({
@@ -313,6 +320,7 @@ export class STComponent implements AfterViewInit, OnChanges, OnDestroy {
           this._isPagination = result.pageShow;
         }
         this._data = result.list;
+        this._statistical = result.statistical;
         return this._data;
       })
       .then(() => this._refCheck())
@@ -327,7 +335,7 @@ export class STComponent implements AfterViewInit, OnChanges, OnDestroy {
     if (cleanStatus) {
       this.clearStatus();
     }
-    this._data.length = 0;
+    this._data = [];
     return this.cd();
   }
 
@@ -350,9 +358,7 @@ export class STComponent implements AfterViewInit, OnChanges, OnDestroy {
     if (pi !== -1) this.pi = pi;
     if (typeof extraParams !== 'undefined') {
       this._req.params =
-        options && options.merge
-          ? { ...this._req.params, ...extraParams }
-          : extraParams;
+        options && options.merge ? { ...this._req.params, ...extraParams } : extraParams;
     }
     this._change('pi');
     return this;
@@ -413,8 +419,9 @@ export class STComponent implements AfterViewInit, OnChanges, OnDestroy {
   _rowClick(e: Event, item: STData, index: number) {
     if ((e.target as HTMLElement).nodeName === 'INPUT') return;
     const { expand, expandRowByClick, rowClickTime } = this;
-    if (!!expand && expandRowByClick) {
+    if (!!expand && item.showExpand !== false && expandRowByClick) {
       item.expand = !item.expand;
+      this.changeEmit('expand', item);
       return;
     }
     ++this.rowClickCount;
@@ -428,6 +435,10 @@ export class STComponent implements AfterViewInit, OnChanges, OnDestroy {
       }
       this.rowClickCount = 0;
     }, rowClickTime);
+  }
+
+  _expandChange(item: STData): void {
+    this.changeEmit('expand', item);
   }
 
   /** 移除某行数据 */
@@ -444,34 +455,26 @@ export class STComponent implements AfterViewInit, OnChanges, OnDestroy {
     // recalculate no
     this._columns
       .filter(w => w.type === 'no')
-      .forEach(c =>
-        this._data.forEach((i, idx) => (i._values[c.__point] = c.noIndex + idx)),
-      );
+      .forEach(c => this._data.forEach((i, idx) => (i._values[c.__point] = { text: this.dataSource.getNoIndex(i, c, idx), org: idx })));
 
     return this.cd();
   }
 
-  //#endregion
+  // #endregion
 
-  //#region sort
+  // #region sort
 
-  // tslint:disable-next-line:no-any
   sort(col: STColumn, idx: number, value: any) {
     if (this.multiSort) {
       col._sort.default = value;
+      col._sort.tick = this.dataSource.nextSortTick;
     } else {
-      this._columns.forEach(
-        (item, index) => (item._sort.default = index === idx ? value : null),
-      );
+      this._columns.forEach((item, index) => (item._sort.default = index === idx ? value : null));
     }
     this._load();
     const res = {
       value,
-      map: this.dataSource.getReqSortMap(
-        this.singleSort,
-        this.multiSort,
-        this._columns,
-      ),
+      map: this.dataSource.getReqSortMap(this.singleSort, this.multiSort, this._columns),
       column: col,
     };
     this.changeEmit('sort', res);
@@ -482,9 +485,9 @@ export class STComponent implements AfterViewInit, OnChanges, OnDestroy {
     return this;
   }
 
-  //#endregion
+  // #endregion
 
-  //#region filter
+  // #region filter
 
   private handleFilter(col: STColumn) {
     col.filter.default = col.filter.menus.findIndex(w => w.checked) !== -1;
@@ -516,9 +519,9 @@ export class STComponent implements AfterViewInit, OnChanges, OnDestroy {
     return this;
   }
 
-  //#endregion
+  // #endregion
 
-  //#region checkbox
+  // #region checkbox
 
   /** 清除所有 `checkbox` */
   clearCheck(): this {
@@ -528,12 +531,10 @@ export class STComponent implements AfterViewInit, OnChanges, OnDestroy {
   private _refCheck(): this {
     const validData = this._data.filter(w => !w.disabled);
     const checkedList = validData.filter(w => w.checked === true);
-    this._allChecked =
-      checkedList.length > 0 && checkedList.length === validData.length;
+    this._allChecked = checkedList.length > 0 && checkedList.length === validData.length;
     const allUnChecked = validData.every(value => !value.checked);
     this._indeterminate = !this._allChecked && !allUnChecked;
-    this._allCheckedDisabled =
-      this._data.length === this._data.filter(w => w.disabled).length;
+    this._allCheckedDisabled = this._data.length === this._data.filter(w => w.disabled).length;
     this.cd();
     return this;
   }
@@ -560,9 +561,9 @@ export class STComponent implements AfterViewInit, OnChanges, OnDestroy {
     return this;
   }
 
-  //#endregion
+  // #endregion
 
-  //#region radio
+  // #region radio
 
   /** 清除所有 `radio` */
   clearRadio(): this {
@@ -579,9 +580,9 @@ export class STComponent implements AfterViewInit, OnChanges, OnDestroy {
     return this;
   }
 
-  //#endregion
+  // #endregion
 
-  //#region buttons
+  // #region buttons
 
   _btnClick(e: Event, record: STData, btn: STColumnButton) {
     if (e) {
@@ -591,13 +592,10 @@ export class STComponent implements AfterViewInit, OnChanges, OnDestroy {
     if (btn.type === 'modal' || btn.type === 'static') {
       const { modal } = btn;
       const obj = { [modal.paramsName]: record };
-      // tslint:disable-next-line:no-any
-      (this.modalHelper[
-        btn.type === 'modal' ? 'create' : 'createStatic'
-      ] as any)(
+      (this.modalHelper[btn.type === 'modal' ? 'create' : 'createStatic'] as any)(
         modal.component,
         { ...obj, ...(modal.params && modal.params(record)) },
-        { ...modal },
+        deepMergeKey({}, true, this.copyCog.modal, modal),
       )
         .pipe(filter(w => typeof w !== 'undefined'))
         .subscribe(res => this.btnCallback(record, btn, res));
@@ -610,7 +608,7 @@ export class STComponent implements AfterViewInit, OnChanges, OnDestroy {
           drawer.title,
           drawer.component,
           { ...obj, ...(drawer.params && drawer.params(record)) },
-          { ...drawer },
+          deepMergeKey({}, true, this.copyCog.drawer, drawer),
         )
         .pipe(filter(w => typeof w !== 'undefined'))
         .subscribe(res => this.btnCallback(record, btn, res));
@@ -625,7 +623,6 @@ export class STComponent implements AfterViewInit, OnChanges, OnDestroy {
     this.btnCallback(record, btn);
   }
 
-  // tslint:disable-next-line:no-any
   private btnCallback(record: STData, btn: STColumnButton, modal?: any) {
     if (!btn.click) return;
     if (typeof btn.click === 'string') {
@@ -651,9 +648,9 @@ export class STComponent implements AfterViewInit, OnChanges, OnDestroy {
     return col.buttons.filter(btn => btn.iif(item, btn, col));
   }
 
-  //#endregion
+  // #endregion
 
-  //#region export
+  // #region export
 
   /**
    * 导出当前页，确保已经注册 `XlsxModule`
@@ -672,16 +669,24 @@ export class STComponent implements AfterViewInit, OnChanges, OnDestroy {
     );
   }
 
-  //#endregion
+  // #endregion
 
-  private refreshColumns() {
+  resetColumns() {
+    return this.refreshColumns()._load();
+  }
+
+  private refreshColumns(): this {
     this._columns = this.columnSource.process(this.columns);
+    return this;
   }
 
   private setClass() {
+    const { type, strictBehavior } = this.widthMode;
     updateHostClass(this.el.nativeElement, this.renderer, {
       [`st`]: true,
       [`st__p-${this.page.placement}`]: this.page.placement,
+      [`st__width-${type}`]: true,
+      [`st__width-strict-${strictBehavior}`]: type === 'strict',
       [`ant-table-rep__hide-header-footer`]: this.responsiveHideHeaderFooter,
     });
   }
@@ -690,9 +695,7 @@ export class STComponent implements AfterViewInit, OnChanges, OnDestroy {
     this.columnSource.restoreAllRender(this._columns);
   }
 
-  ngOnChanges(
-    changes: { [P in keyof this]?: SimpleChange } & SimpleChanges,
-  ): void {
+  ngOnChanges(changes: { [P in keyof this]?: SimpleChange } & SimpleChanges): void {
     if (changes.columns) {
       this.refreshColumns();
     }

@@ -15,10 +15,13 @@ import { Router } from '@angular/router';
 import { RouterTestingModule } from '@angular/router/testing';
 import { of, Observable, Subject } from 'rxjs';
 
-import { en_US, ALAIN_I18N_TOKEN,
+import {
+  en_US,
+  ALAIN_I18N_TOKEN,
   DatePipe,
   DelonLocaleModule,
   DelonLocaleService,
+  DrawerHelper,
   ModalHelper,
 } from '@delon/theme';
 import { deepCopy, deepGet } from '@delon/util';
@@ -43,6 +46,7 @@ import {
   STPage,
   STReq,
   STRes,
+  STWidthMode,
 } from '../table.interfaces';
 import { STModule } from '../table.module';
 
@@ -755,6 +759,39 @@ describe('abc: table', () => {
               });
             });
           });
+          describe('#drawer', () => {
+            it('is normal mode', (done: () => void) => {
+              const columns: STColumn[] = [
+                {
+                  title: '',
+                  buttons: [
+                    {
+                      text: 'a',
+                      type: 'drawer',
+                      click: jasmine.createSpy(),
+                      drawer: {
+                        component: {},
+                        params: (record: any) => ({ aa: 1 }),
+                      },
+                    },
+                  ],
+                },
+              ];
+              const drawerHelp = injector.get(DrawerHelper);
+              const mock$ = new Subject();
+              spyOn(drawerHelp, 'create').and.callFake(() => mock$);
+              page.newColumn(columns).then(() => {
+                expect(drawerHelp.create).not.toHaveBeenCalled();
+                page.clickCell('a');
+                expect(drawerHelp.create).toHaveBeenCalled();
+                expect(columns[0].buttons[0].click).not.toHaveBeenCalled();
+                mock$.next({});
+                expect(columns[0].buttons[0].click).toHaveBeenCalled();
+                mock$.unsubscribe();
+                done();
+              });
+            });
+          });
           describe('#link', () => {
             it('should be trigger click', (done: () => void) => {
               const columns: STColumn[] = [
@@ -1057,8 +1094,18 @@ describe('abc: table', () => {
       });
     });
     describe('#expand', () => {
-      beforeEach(() => {
-        createComp(true, TestExpandComponent);
+      beforeEach(() => createComp(true, TestExpandComponent));
+      it('should be switch expand via expand icon', (done) => {
+        fixture.detectChanges();
+        fixture.whenStable().then(() => {
+          const el = page.getCell(1, 1).querySelector('.ant-table-row-expand-icon') as HTMLElement;
+          page.expectData(1, 'expand', undefined);
+          expect(context.change).not.toHaveBeenCalled();
+          el.click();
+          page.expectData(1, 'expand', true);
+          expect(context.change).toHaveBeenCalled();
+          done();
+        });
       });
       describe('should be expanded when click row if expandRowByClick', () => {
         it('with true', (done) => {
@@ -1067,8 +1114,10 @@ describe('abc: table', () => {
           fixture.whenStable().then(() => {
             const el = page.getCell(1, 2);
             page.expectData(1, 'expand', undefined);
+            expect(context.change).not.toHaveBeenCalled();
             el.click();
             page.expectData(1, 'expand', true);
+            expect(context.change).toHaveBeenCalled();
             done();
           });
         });
@@ -1080,6 +1129,21 @@ describe('abc: table', () => {
             page.expectData(1, 'expand', undefined);
             el.click();
             page.expectData(1, 'expand', undefined);
+            done();
+          });
+        });
+      });
+      describe('should be set showExpand in row data', () => {
+        it(`muse be hide expand icon`, (done) => {
+          context.expandRowByClick = false;
+          context.data = deepCopy(USERS).slice(0, 1);
+          context.data[0].showExpand = false;
+          fixture.detectChanges();
+          fixture.whenStable().then(() => {
+            page.expectElCount('.ant-table-row-expand-icon', 0);
+            expect(context.change).not.toHaveBeenCalled();
+            page.getCell(1, 2).click();
+            expect(context.change).not.toHaveBeenCalled();
             done();
           });
         });
@@ -1385,9 +1449,9 @@ describe('abc: table', () => {
         it('shoule be recalculate no value', done => {
           page.newColumn([ { title: '', type: 'no' } ]).then(() => {
             page.expectCurrentPageTotal(PS);
-            comp._data.forEach((v, idx) => expect(v._values[0]).toBe(idx + 1));
+            comp._data.forEach((v, idx) => expect(v._values[0].text).toBe(idx + 1));
             comp.removeRow(comp._data[0]);
-            comp._data.forEach((v, idx) => expect(v._values[0]).toBe(idx + 1));
+            comp._data.forEach((v, idx) => expect(v._values[0].text).toBe(idx + 1));
             done();
           });
         });
@@ -1431,6 +1495,22 @@ describe('abc: table', () => {
           expect(comp.clearCheck).not.toHaveBeenCalled();
           comp.clearStatus();
           expect(comp.clearCheck).toHaveBeenCalled();
+        });
+      });
+      it('#resetColumns', (done) => {
+        let res = true;
+        const cls = '.st__body tr[data-index="0"] td';
+        page.newColumn([
+          { title: '', index: 'name', iif: () => res },
+        ]);
+        fixture.detectChanges();
+        fixture.whenStable().then(() => {
+          page.expectElCount(cls, 1);
+          res = false;
+          comp.resetColumns();
+          fixture.detectChanges();
+          page.expectElCount(cls, 0);
+          done();
         });
       });
     });
@@ -1485,6 +1565,43 @@ describe('abc: table', () => {
         const ms: STMultiSort = comp.multiSort;
         expect(typeof ms).toBe('object');
         expect(ms.key).toBe('aa');
+      });
+    });
+    describe('#widthMode', () => {
+      it('with type is default', (done) => {
+        context.widthMode = { type: 'default' };
+        fixture.detectChanges();
+        fixture.whenStable().then(() => {
+          page.expectElCount(`.st__width-default`, 1);
+          done();
+        });
+      });
+      describe('with type is strict', () => {
+        it('shoule be add text-truncate class when className is empty and behavior is truncate', (done) => {
+          context.widthMode = { type: 'strict', strictBehavior: 'truncate' };
+          fixture.detectChanges();
+          page
+            .newColumn([{ title: '', index: 'id', width: 50 }])
+            .then(() => {
+              page.expectElCount(`.st__width-strict`, 1);
+              page.expectElCount(`.st__width-strict-truncate`, 1);
+              page.expectElCount(`td.text-truncate`, context.comp._data.length);
+              done();
+            });
+        });
+        it('should be ingore add text-truncate class when className is non-empty', (done) => {
+          context.widthMode = { type: 'strict', strictBehavior: 'truncate' };
+          fixture.detectChanges();
+          page
+            .newColumn([{ title: '', index: 'id', width: 50, className: 'aaaa' }])
+            .then(() => {
+              page.expectElCount(`.st__width-strict`, 1);
+              page.expectElCount(`.st__width-strict-truncate`, 1);
+              page.expectElCount(`.text-truncate`, 0);
+              page.expectElCount(`td.aaaa`, context.comp._data.length);
+              done();
+            });
+        });
       });
     });
   });
@@ -1774,6 +1891,7 @@ describe('abc: table', () => {
         [ps]="ps" [pi]="pi" [total]="total"
         [page]="page"
         [responsiveHideHeaderFooter]="responsiveHideHeaderFooter"
+        [widthMode]="widthMode"
 
         [loading]="loading" [loadingDelay]="loadingDelay"
         [bordered]="bordered" [size]="size"
@@ -1811,6 +1929,7 @@ class TestComponent {
   rowClickTime = 200;
   responsiveHideHeaderFooter = false;
   expandRowByClick = false;
+  widthMode: STWidthMode = {};
 
   error() { }
   change() { }
@@ -1822,7 +1941,8 @@ class TestComponent {
         [data]="data"
         [columns]="columns"
         [expand]="expand"
-        [expandRowByClick]="expandRowByClick">
+        [expandRowByClick]="expandRowByClick"
+        (change)="change($event)">
     <ng-template #expand let-item let-index="index" let-column="column">
       {{ item.id }}
     </ng-template>

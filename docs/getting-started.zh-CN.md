@@ -6,7 +6,7 @@ type: Basic
 
 ## 写在前面
 
-ng-alain 是一个企业级中后台前端/设计解决方案脚手架，我们秉承 [Ant Design](https://ant.design/) 的设计价值观，目标也非常简单，希望在Angular上面开发企业后台更简单、更快速。随着『设计者』的不断反馈，将持续迭代，逐步沉淀和总结出更多设计模式和相应的代码实现，阐述中后台产品模板/组件/业务场景的最佳实践，也十分期待你的参与和共建。
+NG-ALAIN 是一个企业级中后台前端/设计解决方案脚手架，我们秉承 [Ant Design](https://ant.design/) 的设计价值观，目标也非常简单，希望在Angular上面开发企业后台更简单、更快速。随着『设计者』的不断反馈，将持续迭代，逐步沉淀和总结出更多设计模式和相应的代码实现，阐述中后台产品模板/组件/业务场景的最佳实践，也十分期待你的参与和共建。
 
 **如何阅读文档**
 
@@ -27,17 +27,16 @@ ng-alain 是一个企业级中后台前端/设计解决方案脚手架，我们�
 
 ### CLI（推荐）
 
+请先通过 `ng version` 命令确认全局 Angular Cli 版本为最新版本号（当前最新版本号：<img src="https://img.shields.io/npm/v/@angular/cli.svg?style=flat-square" alt="npm">），有关如何升级请参考[CLI 命令参考手册](https://angular.cn/cli)。
+
 ```bash
-# 确保使用的是最新版本 Angular cli
 ng new my-project --style less
 cd my-project
 ng add ng-alain
-# 如果你想创建一个英文版本，则：
-ng add ng-alain --defaultLanguage=en
-ng serve
+npm start
 ```
 
-请参考[命令行工具](/cli)了解更多细节。
+> 请参考[命令行工具](/cli)了解更多细节。
 
 ### 克隆代码
 
@@ -45,14 +44,14 @@ ng serve
 git clone --depth=1 https://github.com/ng-alain/ng-alain.git my-project
 cd my-project
 yarn
-ng serve
+npm start
 ```
 
 > 注：使用CLI安装，是一个干净的脚手架；使用克隆代码会包含所有示例。
 
 ## 目录结构
 
-ng-alain 是一个标准的 Angular CLI 构建的项目，并提供了涵盖中后台开发的各类功能和坑位，下面是整个项目的目录结构。
+NG-ALAIN 是一个标准的 Angular CLI 构建的项目，并提供了涵盖中后台开发的各类功能和坑位，下面是整个项目的目录结构。
 
 ```
 ├── _mock                                       # Mock 数据规则
@@ -83,16 +82,8 @@ ng-alain 是一个标准的 Angular CLI 构建的项目，并提供了涵盖中�
 
 ## 本地开发
 
-安装依赖。
-
 ```bash
-$ yarn
-```
-
-> 遇到问题请阅读 [常见问题](/docs/faq)
-
-```bash
-$ ng serve
+npm start
 ```
 
 启动完成后会打开浏览器访问 [//localhost:4200](//localhost:4200)，若你看到如下页面则代表成功了。
@@ -116,12 +107,12 @@ $ ng serve
 
 1. [![Stack Overflow](https://cdn.sstatic.net/Sites/stackoverflow/company/img/logos/so/so-logo.svg | width=140)](https://stackoverflow.com/questions/tagged/ng-alain)（English）
 2. [![Segment Fault](https://gw.alipayobjects.com/zos/rmsportal/hfYFfCvHTQTUKntlJbMF.svg | width=140)](https://segmentfault.com/t/ng-alain)（中文）
-3. 加入 ng-alain 自助服务群（中文）
+3. 加入 NG-ALAIN 自助服务群（中文）
 
 ![](./assets/qq-group.png)
 
 ## 捐助
 
-如果你觉得 ng-alain 不错，可以考虑自愿为本站打赏或捐助。
+如果你觉得 NG-ALAIN 不错，可以考虑自愿为本站打赏或捐助。
 
 ![](./assets/donate.png)

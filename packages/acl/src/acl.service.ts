@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
+import { DelonACLConfig } from './acl.config';
 import { ACLCanType, ACLType } from './acl.type';
 
 /**
@@ -10,7 +11,9 @@ export class ACLService {
   private roles: string[] = [];
   private abilities: Array<number | string> = [];
   private full = false;
-  private aclChange: BehaviorSubject<ACLType | boolean> = new BehaviorSubject<ACLType | boolean>(null);
+  private aclChange: BehaviorSubject<ACLType | boolean> = new BehaviorSubject<ACLType | boolean>(
+    null,
+  );
 
   /** ACL变更通知 */
   get change(): Observable<ACLType | boolean> {
@@ -25,6 +28,8 @@ export class ACLService {
       abilities: this.abilities,
     };
   }
+
+  constructor(private options: DelonACLConfig) {}
 
   private parseACLType(val: string | string[] | ACLType): ACLType {
     if (typeof val !== 'string' && !Array.isArray(val)) {
@@ -143,6 +148,10 @@ export class ACLService {
       return true;
     }
 
+    const { preCan } = this.options;
+    if (preCan) {
+      roleOrAbility = preCan(roleOrAbility);
+    }
     let t: ACLType = {};
     if (typeof roleOrAbility === 'number') {
       t = { ability: [roleOrAbility] };
@@ -162,10 +171,8 @@ export class ACLService {
     }
     if (t.ability) {
       if (t.mode === 'allOf') {
-        // tslint:disable-next-line:no-any
         return (t.ability as any[]).every(v => this.abilities.includes(v));
       } else {
-        // tslint:disable-next-line:no-any
         return (t.ability as any[]).some(v => this.abilities.includes(v));
       }
     }
@@ -174,11 +181,7 @@ export class ACLService {
 
   /** @inner */
   parseAbility(value: ACLCanType): ACLCanType {
-    if (
-      typeof value === 'number' ||
-      typeof value === 'string' ||
-      Array.isArray(value)
-    ) {
+    if (typeof value === 'number' || typeof value === 'string' || Array.isArray(value)) {
       value = { ability: Array.isArray(value) ? value : [value] } as ACLType;
     }
     delete value.role;

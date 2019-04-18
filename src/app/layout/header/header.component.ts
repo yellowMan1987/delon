@@ -31,6 +31,7 @@ export class HeaderComponent implements OnInit, AfterViewInit {
   useDocsearch = false;
   oldVersionList = [`1.x`];
   currentVersion = 'stable';
+  delon = ['theme', 'auth', 'acl', 'form', 'cache', 'chart', 'mock', 'util', 'cli'];
 
   constructor(
     public i18n: I18NService,
@@ -108,15 +109,11 @@ export class HeaderComponent implements OnInit, AfterViewInit {
   }
 
   langChange(language: LangType) {
-    this.router.navigateByUrl(
-      `${this.i18n.getRealUrl(this.router.url)}/${language}`,
-    );
+    this.router.navigateByUrl(`${this.i18n.getRealUrl(this.router.url)}/${language}`);
   }
 
   onCopy(value: string) {
-    copy(value).then(() =>
-      this.msg.success(this.i18n.fanyi('app.demo.copied')),
-    );
+    copy(value).then(() => this.msg.success(this.i18n.fanyi('app.demo.copied')));
   }
 
   menuVisible = false;
@@ -131,5 +128,14 @@ export class HeaderComponent implements OnInit, AfterViewInit {
     if (item.url) {
       this.router.navigateByUrl(item.url);
     }
+  }
+
+  toViaMobile(url: string) {
+    if (url.indexOf('/') === -1) {
+      url = `/${url}/getting-started`;
+    }
+    this.router.navigateByUrl(`${url}/${this.i18n.zone}`).then(() => {
+      this.menuVisible = false;
+    });
   }
 }

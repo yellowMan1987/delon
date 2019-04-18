@@ -8,9 +8,11 @@ import {
   OnDestroy,
   OnInit,
   Output,
+  SimpleChange,
+  SimpleChanges,
   TemplateRef,
 } from '@angular/core';
-import { DelonLocaleService } from '@delon/theme';
+import { DelonLocaleService, LocaleData } from '@delon/theme';
 import { deepCopy, InputBoolean } from '@delon/util';
 import { Subscription } from 'rxjs';
 
@@ -26,7 +28,10 @@ import { di, resolveIf, retrieveSchema, FORMATMAPS } from './utils';
 import { SchemaValidatorFactory } from './validator.factory';
 import { WidgetFactory } from './widget.factory';
 
-export function useFactory(schemaValidatorFactory: SchemaValidatorFactory, options: DelonFormConfig) {
+export function useFactory(
+  schemaValidatorFactory: SchemaValidatorFactory,
+  options: DelonFormConfig,
+) {
   return new FormPropertyFactory(schemaValidatorFactory, options);
 }
 
@@ -44,21 +49,22 @@ export function useFactory(schemaValidatorFactory: SchemaValidatorFactory, optio
   ],
   host: {
     '[class.sf]': 'true',
-    '[class.sf-search]': `mode === 'search'`,
-    '[class.sf-edit]': `mode === 'edit'`,
+    '[class.sf__inline]': `layout === 'inline'`,
+    '[class.sf__search]': `mode === 'search'`,
+    '[class.sf__edit]': `mode === 'edit'`,
+    '[class.sf__no-error]': `onlyVisual`,
   },
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SFComponent implements OnInit, OnChanges, OnDestroy {
   private i18n$: Subscription;
-  // tslint:disable-next-line:no-any
-  locale: any = {};
   private _renders = new Map<string, TemplateRef<void>>();
   private _item: {};
   private _valid = true;
   private _defUi: SFUISchemaItem;
   private _inited = false;
 
+  locale: LocaleData = {};
   rootProperty: FormProperty = null;
   _formData: {};
   _btn: SFButton;
@@ -92,6 +98,8 @@ export class SFComponent implements OnInit, OnChanges, OnDestroy {
   @Input() autocomplete: 'on' | 'off';
   /** 立即显示错误视觉 */
   @Input() @InputBoolean() firstVisual = true;
+  /** 是否只展示错误视觉不显示错误文本 */
+  @Input() @InputBoolean() onlyVisual = false;
   /** 表单模式 */
   @Input()
   set mode(value: 'default' | 'search' | 'edit') {
@@ -100,13 +108,17 @@ export class SFComponent implements OnInit, OnChanges, OnDestroy {
         this.layout = 'inline';
         this.firstVisual = false;
         this.liveValidate = false;
-        if (this._btn) this._btn.submit = this._btn.search;
+        if (this._btn) {
+          this._btn.submit = this._btn.search;
+        }
         break;
       case 'edit':
         this.layout = 'horizontal';
         this.firstVisual = false;
         this.liveValidate = true;
-        if (this._btn) this._btn.submit = this._btn.edit;
+        if (this._btn) {
+          this._btn.submit = this._btn.edit;
+        }
         break;
     }
     this._mode = value;
@@ -115,7 +127,10 @@ export class SFComponent implements OnInit, OnChanges, OnDestroy {
     return this._mode;
   }
   private _mode: 'default' | 'search' | 'edit';
-
+  /**
+   * Whether to load status，when `true` reset button is disabled status, submit button is loading status
+   */
+  @Input() @InputBoolean() loading = false;
   /** 数据变更时回调 */
   @Output() readonly formChange = new EventEmitter<{}>();
   /** 提交表单时回调 */
@@ -132,13 +147,13 @@ export class SFComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   /** 表单值 */
-  // tslint:disable-next-line:no-any
   get value(): { [key: string]: any } {
     return this._item;
   }
 
   /**
    * 根据路径获取表单元素属性
+   * @param path [路径](https://ng-alain.com/form/qa#path)
    */
   getProperty(path: string): FormProperty {
     return this.rootProperty.searchProperty(path);
@@ -146,18 +161,17 @@ export class SFComponent implements OnInit, OnChanges, OnDestroy {
 
   /**
    * 根据路径获取表单元素当前值
+   * @param path [路径](https://ng-alain.com/form/qa#path)
    */
-  // tslint:disable-next-line:no-any
   getValue(path: string): any {
     return this.getProperty(path)!.value;
   }
 
   /**
    * 根据路径设置某个表单元素属性值
-   * @param path 路径
+   * @param path [路径](https://ng-alain.com/form/qa#path)
    * @param value 新值
    */
-  // tslint:disable-next-line:no-any
   setValue(path: string, value: any): this {
     const item = this.getProperty(path);
     if (!item) {
@@ -208,15 +222,14 @@ export class SFComponent implements OnInit, OnChanges, OnDestroy {
     ) => {
       Object.keys(schema.properties).forEach(key => {
         const uiKey = `$${key}`;
-        const property = retrieveSchema(
-          schema.properties[key] as SFSchema,
-          definitions,
-        );
+        const property = retrieveSchema(schema.properties[key] as SFSchema, definitions);
         const ui = {
           widget: property.type,
           ...(property.format && FORMATMAPS[property.format]),
           ...(typeof property.ui === 'string' ? { widget: property.ui } : null),
-          ...(!property.ui && Array.isArray(property.enum) && property.enum.length > 0 ? { widget: 'select' } : null),
+          ...(!property.format && !property.ui && Array.isArray(property.enum) && property.enum.length > 0
+            ? { widget: 'select' }
+            : null),
           ...this._defUi,
           ...(property.ui as SFUISchemaItem),
           ...uiSchema[uiKey],
@@ -230,14 +243,10 @@ export class SFComponent implements OnInit, OnChanges, OnDestroy {
           } else {
             if (!ui.spanLabel)
               ui.spanLabel =
-                typeof parentUiSchema.spanLabel === 'undefined'
-                  ? 5
-                  : parentUiSchema.spanLabel;
+                typeof parentUiSchema.spanLabel === 'undefined' ? 5 : parentUiSchema.spanLabel;
             if (!ui.spanControl)
               ui.spanControl =
-                typeof parentUiSchema.spanControl === 'undefined'
-                  ? 19
-                  : parentUiSchema.spanControl;
+                typeof parentUiSchema.spanControl === 'undefined' ? 19 : parentUiSchema.spanControl;
             if (!ui.offsetControl)
               ui.offsetControl =
                 typeof parentUiSchema.offsetControl === 'undefined'
@@ -249,15 +258,15 @@ export class SFComponent implements OnInit, OnChanges, OnDestroy {
           ui.spanControl = null;
           ui.offsetControl = null;
         }
-        if (ui.widget === 'date' && ui.end != null && parentSchema) {
-          const dateEndProperty = parentSchema.properties[ui.end];
+        if (ui.widget === 'date' && ui.end != null) {
+          const dateEndProperty = schema.properties[ui.end];
           if (dateEndProperty) {
             dateEndProperty.ui = {
               ...(dateEndProperty.ui as SFUISchemaItem),
               hidden: true,
             };
           } else {
-            ui.end = '';
+            ui.end = null;
           }
         }
         ui.hidden = typeof ui.hidden === 'boolean' ? ui.hidden : false;
@@ -306,6 +315,9 @@ export class SFComponent implements OnInit, OnChanges, OnDestroy {
       ..._schema.ui,
       ...this.ui['*'],
     };
+    if (this.onlyVisual === true) {
+      this._defUi.onlyVisual = true;
+    }
 
     // root
     this._ui = { ...this._defUi };
@@ -318,9 +330,7 @@ export class SFComponent implements OnInit, OnChanges, OnDestroy {
 
     this._schema = _schema;
 
-    if (this._ui.debug) {
-      di('cover schema & ui', this._ui, _schema);
-    }
+    di(this._ui, 'cover schema & ui', this._ui, _schema);
   }
 
   private coverButtonProperty() {
@@ -356,7 +366,8 @@ export class SFComponent implements OnInit, OnChanges, OnDestroy {
     if (this._mode) {
       this.mode = this._mode;
     }
-    if (this._ui.debug) di('button property', this._btn);
+
+    di(this._ui, 'button property', this._btn);
   }
 
   ngOnInit(): void {
@@ -364,30 +375,31 @@ export class SFComponent implements OnInit, OnChanges, OnDestroy {
     this.validator();
   }
 
-  ngOnChanges(): void {
+  ngOnChanges(changes: { [P in keyof this]?: SimpleChange } & SimpleChanges): void {
+    if (changes.loading && Object.keys(changes).length === 1) {
+      this.cdr.detectChanges();
+      return ;
+    }
     this.refreshSchema();
   }
 
   /** @internal */
   _addTpl(path: string, templateRef: TemplateRef<void>) {
-    const property = this.rootProperty.searchProperty(path);
-    if (!property) {
-      console.warn(`未找到路径：${path}`);
-      return;
-    }
     if (this._renders.has(path)) {
-      console.warn(`已经存在相同自定义路径：${path}`);
+      console.warn(`Duplicate definition "${path}" custom widget`);
       return;
     }
     this._renders.set(path, templateRef);
-    const pui: SFUISchemaItemRun = this.rootProperty.searchProperty(path).ui;
-    pui._render = templateRef;
+    this.attachCustomRender();
   }
 
   private attachCustomRender() {
     this._renders.forEach((tpl, path) => {
-      const pui: SFUISchemaItemRun = this.rootProperty.searchProperty(path).ui;
-      if (!pui._render) pui._render = tpl;
+      const property = this.rootProperty.searchProperty(path);
+      if (property == null) {
+        return;
+      }
+      property.ui._render = tpl;
     });
   }
 
